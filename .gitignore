@@ -1,0 +1,35 @@
+# --- Python junk ---
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual envs
+.venv/
+venv/
+ENV/
+
+# Editor/OS
+.DS_Store
+Thumbs.db
+.vscode/
+
+# --- Onika: keep folder structure, ignore contents ---
+# Examples are reference material and can be excluded from the main repo.
+examples/**
+
+# Ignore ALL model files (checkpoints, safetensors, etc.), but keep folder docs.
+models/**
+!models/**/
+!models/**/README.md
+
+# Ignore ALL runtime/training artifacts under project/, but keep folder docs.
+project/**
+!project/**/
+!project/**/README.md

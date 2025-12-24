@@ -1,0 +1,32 @@
+{
+    "host": "127.0.0.1",
+    "port": 7880,
+    "debug_mode": false,
+    "paths": {
+        "dataset": "project/dataset",
+        "models": "models",
+        "outputs": "project/outputs",
+        "logs": "project/logs"
+    },
+    "accelerate": {
+        "mixed_precision": "fp16",
+        "num_processes": 1,
+        "num_cpu_threads_per_process": 2,
+        "gpu_ids": "0"
+    },
+    "model_saving": {
+        "save_precision": "bf16",
+        "save_model_as": "safetensors"
+    },
+    "advanced_training": {
+        "cache_latents": true,
+        "cache_latents_to_disk": false,
+        "learning_rate_te": 0.0001,
+        "lr_scheduler": "cosine"
+    },
+    "training": {
+        "default_resolution": 512,
+        "default_batch_size": 1,
+        "default_epochs": 10
+    }
+}

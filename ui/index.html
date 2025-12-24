@@ -1,0 +1,1779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Onika Trainer</title>
+    <link rel="icon" href="/ui/favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="/ui/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="notification-container"></div>
+    <div id="xref-layer" class="xref-layer"></div>
+    <template id="xref-pointer-template">
+        <button type="button" class="xref-pointer" aria-label="Go to setting">
+            <span class="xref-pointer-dot" aria-hidden="true"></span>
+            <span class="xref-pointer-label"></span>
+        </button>
+    </template>
+    <div class="app-container">
+        <!-- SIDEBAR -->
+        <nav class="sidebar">
+            <button id="nav-training" class="nav-item active" onclick="openTab('training')">Training</button>
+            <button class="nav-item" onclick="openTab('console')">Console</button>
+            <button class="nav-item" onclick="openTab('metadata')">Metadata</button>
+            <!-- <button class="nav-item" onclick="openTab('conversion')">Conversion</button> -->
+            
+            <div style="flex: 1;"></div>
+            
+            <div class="card" style="padding: 14px;">
+                <div class="card-title" style="margin-bottom: 8px;">System</div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span class="status-dot" id="system-dot"></span>
+                    <span id="system-status" style="font-size: 12px;">Connecting...</span>
+                </div>
+            </div>
+        </nav>
+
+        <!-- MAIN CONTENT -->
+        <main class="main-content">
+            
+            <!-- TRAINING TAB -->
+            <div id="tab-training" class="tab-content active">
+                <div class="page-header">
+                    <h1 class="page-title">Training</h1>
+                    <p class="page-subtitle">Configure and start your LoRA/LyCORIS training</p>
+                </div>
+
+                <!-- Loss Display and Status moved to progress section -->
+
+                <!-- Preset Selector -->
+                <div class="card preset-card">
+                    <div class="preset-row">
+                        <label>Preset</label>
+                        <select id="preset_selector">
+                            <option value="">Select Preset...</option>
+                        </select>
+                    </div>
+                    <div class="preset-row preset-buttons">
+                        <button class="btn-primary" onclick="loadSelectedPreset()">Load</button>
+                        <button id="btn-save-preset" type="button" class="btn-secondary">Save Preset</button>
+                        <button id="btn-new-preset" type="button" class="btn-secondary">New Preset</button>
+                        <button id="btn-delete-preset" type="button" class="btn-danger">Delete</button>
+                    </div>
+                    <div class="help-text">Loads a preset from <span class="mono">presets/</span> and applies it to the form. Presets are a fast way to switch profiles. Save Preset overwrites the selected preset. New Preset creates a new one with a custom name. Delete removes the selected preset.</div>
+                </div>
+
+                <!-- Config Tabs -->
+                        <div class="card">
+                    <div class="sub-tabs">
+                        <button id="subtab-model" type="button" class="sub-tab-btn active" onclick="openSubTab('cfg-model')">Model</button>
+                        <button type="button" class="sub-tab-btn" onclick="openSubTab('cfg-network')">Network</button>
+                        <button type="button" class="sub-tab-btn" onclick="openSubTab('cfg-dataset')">Dataset</button>
+                        <button type="button" class="sub-tab-btn" onclick="openSubTab('cfg-text')">Text Encoder</button>
+                        <button type="button" class="sub-tab-btn" onclick="openSubTab('cfg-aug')">Augmentation & Caching</button>
+                        <button type="button" class="sub-tab-btn" onclick="openSubTab('cfg-basic')">Learning</button>
+                        <button type="button" class="sub-tab-btn" onclick="openSubTab('cfg-advanced')">Advanced</button>
+                        <button type="button" class="sub-tab-btn" onclick="openSubTab('cfg-samples')">Samples</button>
+                        <button type="button" class="sub-tab-btn" onclick="openSubTab('cfg-meta')">Metadata</button>
+                    </div>
+
+                    <form id="training-form">
+                        <!-- Model Config -->
+                        <div id="cfg-model" class="sub-tab-content active">
+                            <div class="form-group">
+                                <label>Base Model</label>
+                                <select id="base_model_name" name="base_model_name"></select>
+                                <div class="help-text">The foundation model used for training. Selecting a model that closely matches your target style improves convergence speed. Ensure the architecture matches your training settings (e.g., SDXL base for SDXL training). Training on a base model like SDXL 1.0 is generally more stable than using a heavily fine-tuned "baked" model.</div>
+                            </div>
+                            <div class="form-group">
+                                <label>Model Architecture</label>
+                                <select id="model_type" name="model_type">
+                                    <option value="sdxl">SDXL / Pony</option>
+                                    <option value="sd_legacy">SD 1.5 / 2.0</option>
+                                    <option value="sd3">SD 3.0</option>
+                                    <option value="sd3.5">SD 3.5</option>
+                                    <option value="flux1">Flux.1</option>
+                                    <option value="flux2">Flux.2</option>
+                                </select>
+                                <div class="help-text">Specifies the architecture logic (SDXL, SD1.5, Flux) required for weight loading and latent processing. Selecting an architecture that does not match the base model will result in shape mismatch errors.</div>
+                            </div>
+                            <div class="form-group">
+                                <button type="button" class="btn btn-secondary" onclick="autoOptimize()">Auto-Optimize for My Hardware</button>
+                                <div class="help-text">Automatically adjusts precision, quantization, and memory settings based on your detected GPU VRAM.</div>
+                            </div>
+                            <div class="form-group">
+                                <label data-pointer="q_lora">Model Quantization (Q-LoRA)</label>
+                                <select id="quantization_bit" name="quantization_bit">
+                                    <option value="">None (Standard fp16/bf16)</option>
+                                    <option value="8">8-bit (Low VRAM)</option>
+                                    <option value="4">4-bit (Extreme Low VRAM)</option>
+                                </select>
+                                <div class="help-text">Reduces model precision to 8-bit or 4-bit to significantly lower VRAM requirements, enabling training on hardware with as little as 8GB VRAM. Note that lower precision may slightly impact accuracy and requires the `bitsandbytes` library.</div>
+                            </div>
+                            <div class="form-group">
+                                <label>Output Name</label>
+                                <input type="text" name="output_name" value="my_lora_v1" placeholder="e.g. character_lora_v1">
+                                <div class="help-text">The filename prefix for saved LoRA adapters. Use unique names to organize different versions and prevent overwriting previous results.</div>
+                            </div>
+                            <div class="form-group">
+                                <label>Output Directory</label>
+                                <input type="text" name="output_dir" value="project/outputs">
+                                <div class="help-text">The destination folder for training results. Ensure sufficient disk space is available to prevent training interruptions.</div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Save Precision</label>
+                                    <select name="save_precision">
+                                        <option value="AUTO" selected>AUTO</option>
+                                        <option value="float16">float16</option>
+                                        <option value="bf16">bf16</option>
+                                        <option value="float32">float32</option>
+                                    </select>
+                                    <div class="help-text">The bit depth for saved model files. `float16` is the standard for a balance of size and precision, while `float32` provides maximum fidelity at the cost of significantly larger file sizes.</div>
+                                </div>
+                                <div class="form-group">
+                                    <label>Save Format</label>
+                                    <select name="save_model_as">
+                                        <option value="safetensors">safetensors</option>
+                                        <option value="ckpt">ckpt</option>
+                                        <option value="diffusers">diffusers</option>
+                                    </select>
+                                    <div class="help-text">The file format for the output. `safetensors` is recommended for its security and loading speed. `ckpt` is a legacy format, and `diffusers` saves the model as a directory structure.</div>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Save Every N Epochs</label>
+                                    <input type="number" name="save_every_n_epochs" value="1">
+                                    <div class="help-text">Frequency of checkpoint saves during training. Regular saving allows for recovery from crashes and provides multiple versions to evaluate for overfitting.</div>
+                                </div>
+                                <div class="form-group">
+                                    <label>Save Every N Steps</label>
+                                    <input type="number" name="save_every_n_steps" placeholder="Optional">
+                                    <div class="help-text">Alternative frequency control based on training steps rather than epochs.</div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Resume from Checkpoint</label>
+                                <input type="text" name="resume_from_checkpoint" placeholder="e.g. latest or path/to/checkpoint-1000">
+                                <div class="help-text">Continues training from a previously saved state. Note that changing core parameters like learning rate or rank when resuming can lead to training instability.</div>
+                            </div>
+                                <div class="form-group">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" name="save_best_only">
+                                        Save Only Best Models (Lowest Loss)
+                                    </label>
+                                    <div class="help-text">Retains only the checkpoint with the lowest recorded loss to save disk space. Note that the lowest loss does not always correlate with the best visual quality.</div>
+                                </div>
+                                <div class="form-group">
+                                    <label>Checkpoints Total Limit</label>
+                                    <input type="number" name="checkpoints_total_limit" placeholder="Optional">
+                                    <div class="help-text">The maximum number of checkpoints to retain. Older checkpoints are automatically deleted to manage disk usage.</div>
+                                </div>
+                            </div>                        <!-- Network Config -->
+                        <div id="cfg-network" class="sub-tab-content">
+                            <div class="form-group">
+                                <label>Network Type</label>
+                                <select name="network_type" id="network_type" onchange="updateNetworkFields()">
+                                    <option value="lora">LoRA</option>
+                                    <option value="loha">LoHa</option>
+                                    <option value="lokr">LoKr</option>
+                                    <option value="lycoris">LyCORIS</option>
+                                    <option value="oft">OFT (Orthogonal Finetuning)</option>
+                                </select>
+                                <div class="help-text">The architecture of the adapter. LoRA is the industry standard. LoHa and LoKr offer higher expressiveness but may require more careful tuning. OFT is designed to preserve hypersphere energy, which is particularly effective for Flux models.</div>
+                            </div>
+                            
+                            <!-- LyCORIS Specific -->
+                            <div id="lycoris_fields" class="conditional-fields hidden">
+                                <div class="field-title">LyCORIS Settings</div>
+                                <div class="form-group">
+                                    <label>Algorithm</label>
+                                    <select name="algo">
+                                        <option value="lora">lora</option>
+                                        <option value="loha">loha</option>
+                                        <option value="lokr">lokr</option>
+                                        <option value="locon">locon</option>
+                                        <option value="full">full</option>
+                                    </select>
+                                    <div class="help-text">LyCORIS algorithm variant (only relevant for LyCORIS/LoHa modes). Different algorithms trade off expressiveness vs stability. If you’re not sure, start with <span class="mono">lora</span>/<span class="mono">locon</span> and only switch when you can clearly measure a benefit.</div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Conv Dim</label>
+                                        <input type="number" name="conv_dim" placeholder="e.g. 16">
+                                        <div class="help-text">Optional conv adapter rank for LoCon/LyCORIS. Low values add a small convolutional capacity boost; high values increase VRAM and can overfit texture/detail quickly. Leave empty if you’re not explicitly using a conv-based method.</div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Conv Alpha</label>
+                                        <input type="number" name="conv_alpha" placeholder="e.g. 1">
+                                        <div class="help-text">Optional conv adapter scaling (alpha). Lower alpha makes the conv part “gentler”; higher alpha makes it bite harder and can destabilize or overshoot. Typically ≤ conv dim; if conv effects look too strong, reduce alpha before reducing dim.</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Network Dim (Rank)</label>
+                                    <input type="number" name="network_dim" value="32">
+                                    <div class="help-text">The capacity of the adapter. Higher values (e.g., 128) allow for more detailed learning but increase the risk of overfitting and result in larger file sizes. Lower values (e.g., 16) generalize better and produce smaller files.</div>
+                                </div>
+                                <div class="form-group">
+                                    <label>Network Alpha</label>
+                                    <input type="number" name="network_alpha" value="16">
+                                    <div class="help-text">A scaling factor that prevents weight updates from being too aggressive. A common rule of thumb is to set Alpha to half of the Network Dim for stability, or equal to Dim for stronger effects.</div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Network Module</label>
+                                <input type="text" name="network_module" value="networks.lora" placeholder="networks.lora">
+                                <div class="help-text">The internal Python module used for the adapter. This is an advanced setting and should generally not be modified.</div>
+                            </div>
+                            <div class="form-group">
+                                <label>Network Args</label>
+                                <input type="text" name="network_args" placeholder="Comma separated args (e.g. arg1=val1, arg2=val2)">
+                                <div class="help-text">Additional arguments for the network module, provided as comma-separated key=value pairs. Use this for specialized options like dropout or decomposition. Incorrect arguments may lead to training instability.</div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>LoRA Layers (SD3/Flux)</label>
+                                    <input type="text" name="lora_layers" placeholder="e.g. attn.to_q, attn.to_k">
+                                    <div class="help-text">Allows targeting specific layers (e.g., attention layers) for surgical fine-tuning.</div>
+                                </div>
+                                <div class="form-group">
+                                    <label>LoRA Blocks (SD3/Flux)</label>
+                                    <input type="text" name="lora_blocks" placeholder="e.g. 12, 30">
+                                    <div class="help-text">Allows targeting specific blocks (e.g., mid blocks) within the model architecture.</div>
+                                </div>
+                            </div>
+                            <div class="field-title" style="margin-top: 16px;">Advanced LoRA</div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Module Dropout</label>
+                                    <input type="number" name="module_dropout" value="0" step="0.1" min="0" max="1">
+                                    <div class="help-text">Randomly disables entire modules during training to prevent overfitting and improve generalization.</div>
+                                </div>
+                                <div class="form-group">
+                                    <label>Rank Dropout</label>
+                                    <input type="number" name="rank_dropout" value="0" step="0.1" min="0" max="1">
+                                    <div class="help-text">Randomly drops individual rank dimensions as a form of regularization.</div>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Network Dropout</label>
+                                    <input type="number" name="network_dropout" value="0" step="0.1" min="0" max="1">
+                                    <div class="help-text">Randomly drops neuron outputs within the adapter to improve robustness.</div>
+                                </div>
+                                <div class="form-group">
+                                    <label>DoRA Weight Decay</label>
+                                    <input type="number" name="dora_weight_decay" placeholder="Optional" step="0.01">
+                                    <div class="help-text">Weight decay specifically applied to DoRA magnitude vectors.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Dataset Config -->
+                        <div id="cfg-dataset" class="sub-tab-content">
+                            <div class="form-group">
+                            <div class="help-text">Tip: If both “Sample Every N Steps” and “Sample Every N Epochs” are left empty, Onika will not generate sample images (saves a lot of time). On low and mid-range GPUs, generating samples during training is generally not recommended.</div>
+                                <label>Dataset Path</label>
+                                <input type="text" name="dataset_path" value="project/dataset">
+                                <div class="help-text">The directory containing training images and their corresponding caption files (e.g., .txt). Dataset quality is the most critical factor in training success; ensure captions accurately describe the images.</div>
+                            </div>
+                            <div class="card" style="padding: 12px; margin-bottom: 12px;">
+                                <div class="field-title">DreamBooth / Prior Preservation</div>
+                                <div class="form-group">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" name="use_prior_preservation">
+                                        Enable Prior Preservation (Reg Images)
+                                    </label>
+                                    <div class="help-text">Uses regularization images to prevent the model from losing its original understanding of the class (e.g., "person") while learning a specific instance. This is essential for maintaining the model's general knowledge but increases training time.</div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Instance Prompt</label>
+                                        <input type="text" name="instance_prompt" placeholder="e.g. a photo of sks person">
+                                        <div class="help-text">The combination of a unique trigger word and a class word (e.g., "sks person") that identifies the specific subject being trained.</div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Class Prompt</label>
+                                        <input type="text" name="class_prompt" placeholder="e.g. a photo of a person">
+                                        <div class="help-text">The generic class word (e.g., "person") used to identify regularization images.</div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Negative Class Prompt</label>
+                                        <input type="text" name="reg_negative_prompt" placeholder="low quality, bad anatomy, worst quality, lowres">
+                                        <div class="help-text">Negative prompt used when generating regularization images.</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Reg Images Directory</label>
+                                        <input type="text" name="reg_data_dir" placeholder="project/reg">
+                                        <div class="help-text">The folder containing regularization images, used only when prior preservation is enabled.</div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Num Class Images</label>
+                                        <input type="number" name="num_class_images" value="0" min="0">
+                                        <div class="help-text">The target number of regularization images. A common recommendation is 100 images per instance image.</div>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="checkbox-label" style="margin-bottom: 10px;">
+                                        <input type="checkbox" name="auto_generate_reg_images" onchange="toggleRegGenSettings(this)">
+                                        Auto-generate Reg Images
+                                    </label>
+                                    <div class="help-text">Automatically generates regularization images if they are not already present in the specified directory.</div>
+                                </div>
+
+                                <div id="reg-gen-settings" style="padding: 10px;">
+                                    <div class="field-title" style="font-size: 0.9em; margin-bottom: 10px; color: #aaa;">Generation Settings</div>
+                                    
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label>Scheduler</label>
+                                            <select name="reg_scheduler">
+                                                <option value="euler_a" selected>Euler A (Fast)</option>
+                                                <option value="dpm++_2m_karras">DPM++ 2M Karras (Quality)</option>
+                                                <option value="euler">Euler (Standard)</option>
+                                            </select>
+                                            <div class="help-text">Sampler used for generating regularization images.</div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Steps</label>
+                                            <input type="number" name="reg_infer_steps" value="20" min="1">
+                                            <div class="help-text">Inference steps. Lower (20) is faster, higher (30-50) is better quality.</div>
+                                        </div>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label>Guidance Scale (CFG)</label>
+                                            <input type="number" name="reg_guidance_scale" value="7.5" step="0.1">
+                                            <div class="help-text">How strictly the generator follows the prompt.</div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Seed</label>
+                                            <input type="number" name="reg_seed" value="-1">
+                                            <div class="help-text">Random seed (-1 for random).</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Duplicate DreamBooth/Prior card removed; single source of truth above -->
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label data-pointer="resolution">Resolution</label>
+                                    <select id="resolution" name="resolution">
+                                        <option value="512">512 x 512 (SD 1.5)</option>
+                                        <option value="768">768 x 768 (SD 2.0/2.1)</option>
+                                        <option value="1024" selected>1024 x 1024 (SDXL Default)</option>
+                                        <option value="1280">1280 x 1280 (SDXL High)</option>
+                                        <option value="1536">1536 x 1536 (SDXL Ultra)</option>
+                                        <option value="2048">2048 x 2048 (Flux/Extreme)</option>
+                                    </select>
+                                    <div class="help-text">The target resolution for training. Higher resolutions capture more detail but require more VRAM. Ensure the resolution is appropriate for the model architecture (e.g., 1024x1024 for SDXL, 512x512 for SD1.5).</div>
+                                </div>
+                                <div class="form-group">
+                                    <label data-pointer="batch_size">Batch Size</label>
+                                    <input type="number" name="batch_size" value="1">
+                                    <div class="help-text">The number of images processed simultaneously. Higher batch sizes can lead to faster training and smoother gradients but significantly increase VRAM usage.</div>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Max Epochs</label>
+                                    <input type="number" name="max_train_epochs" value="10">
+                                    <div class="help-text">The total number of full passes through the dataset. For LoRA training, 10-20 epochs are typically sufficient. Excessive epochs can lead to overfitting and "fried" images.</div>
+                                </div>
+                                <div class="form-group">
+                                    <label>Max Steps</label>
+                                    <input type="number" name="max_train_steps" placeholder="Optional">
+                                    <div class="help-text">An optional hard limit on the total number of training steps.</div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="center_crop" checked>
+                                    Center Crop (Smart 1:1)
+                                </label>
+                                <div class="help-text">If enabled, images that are close to square (e.g. 1210x1280) will be center-cropped to a perfect 1:1 ratio. This is recommended for character training to ensure consistent framing.</div>
+                            </div>
+                            <div class="form-group">
+                                <label class="checkbox-label" data-pointer="enable_bucket">
+                                    <input type="checkbox" name="enable_bucket" checked>
+                                    Enable Aspect Ratio Bucketing
+                                </label>
+                                <div class="help-text">Automatically groups images by aspect ratio to prevent unnecessary cropping and preserve the original composition of your training data.</div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label data-pointer="min_bucket_reso">Minimum Bucket Resolution</label>
+                                    <input type="number" name="min_bucket_reso" value="256">
+                                    <div class="help-text">The minimum allowed resolution for an image bucket. This prevents the use of very small or blurry images during training.</div>
+                                </div>
+                                <div class="form-group">
+                                    <label data-pointer="max_bucket_reso">Maximum Bucket Resolution</label>
+                                    <input type="number" name="max_bucket_reso" value="2048">
+                                    <div class="help-text">The maximum allowed resolution for an image bucket, helping to prevent out-of-memory (OOM) errors on exceptionally large images.</div>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label data-pointer="bucket_reso_steps">Bucket Resolution Step</label>
+                                    <input type="number" name="bucket_reso_steps" value="64">
+                                    <div class="help-text">The grid size used for bucket dimensions. 64 is the standard value for most architectures.</div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="checkbox-label" style="margin-top: 30px;">
+                                        <input type="checkbox" name="bucket_no_upscale">
+                                        No Upscale
+                                    </label>
+                                    <div class="help-text">Prevents the upscaling of small images to fit bucket dimensions, avoiding potential artifacts.</div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="persistent_data_loader_workers">
+                                    Persistent Data Loader Workers
+                                </label>
+                                <div class="help-text">Keeps CPU data loading workers active between epochs to improve training speed, at the cost of increased RAM usage.</div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>DataLoader Workers</label>
+                                    <input type="number" name="dataloader_num_workers" value="8" min="0">
+                                    <div class="help-text">The number of CPU threads dedicated to loading and preprocessing data. Higher values can feed the GPU faster but may cause system lag if set too high.</div>
+                                </div>
+                                <div class="form-group">
+                                    <label>DataLoader Shuffle</label>
+                                    <select name="dataloader_shuffle">
+                                        <option value="true" selected>Shuffle</option>
+                                        <option value="false">Deterministic order</option>
+                                    </select>
+                                    <div class="help-text">Randomizes the order of images in each epoch to prevent the model from learning the sequence of the dataset.</div>
+                                </div>
+                            </div>
+                            
+                        </div>
+
+                        <!-- Text Encoder Config -->
+                        <div id="cfg-text" class="sub-tab-content">
+                            <div class="field-title">Text Encoder</div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Train Text Encoder</label>
+                                    <select name="train_text_encoder">
+                                        <option value="true">Yes</option>
+                                        <option value="false">No</option>
+                                    </select>
+                                    <div class="help-text">Enables training of the text encoder alongside the UNet, which can improve prompt adherence but may reduce the model's flexibility or editability.</div>
+                                </div>
+                                <div class="form-group">
+                                    <label>Clip Skip</label>
+                                    <input type="number" name="clip_skip" value="0" min="0" max="8">
+                                    <div class="help-text">Skips the top N layers of the CLIP text encoder. SD1.5 typically uses a skip of 1, while SDXL usually uses 0. Incorrect values can lead to poor prompt understanding.</div>
+                                </div>
+                            </div>
+                            <div class="field-title" style="margin-top: 12px;">Textual Inversion (Pivotal Tuning)</div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Train Textual Inversion</label>
+                                    <select name="train_text_encoder_ti">
+                                        <option value="false">No</option>
+                                        <option value="true">Yes</option>
+                                    </select>
+                                    <div class="help-text">Trains new tokens (Textual Inversion) to add specific words or concepts to the model's vocabulary.</div>
+                                </div>
+                                <div class="form-group">
+                                    <label>Token Abstraction</label>
+                                    <input type="text" name="token_abstraction" value="TOK">
+                                    <div class="help-text">The placeholder string (e.g., "TOK") used to represent the new concept in captions.</div>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>New Tokens Per Abstraction</label>
+                                    <input type="number" name="num_new_tokens_per_abstraction" value="2" min="1">
+                                    <div class="help-text">The number of vectors assigned to each new token. More vectors can capture more detail but are more difficult to train effectively.</div>
+                                </div>
+                                <div class="form-group">
+                                    <label>TI Training Fraction</label>
+                                    <input type="number" name="train_text_encoder_ti_frac" value="0.5" step="0.1" min="0" max="1">
+                                    <div class="help-text">The percentage of total training epochs during which Textual Inversion training is active.</div>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>TE Training Fraction</label>
+                                    <input type="number" name="train_text_encoder_frac" value="1.0" step="0.1" min="0" max="1">
+                                    <div class="help-text">The percentage of total training epochs during which Text Encoder training is active.</div>
+                                </div>
+                            </div>
+                            <div class="field-title" style="margin-top: 12px;">Caption Weighting</div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" name="weighted_captions">
+                                        Enable Weighted Captions
+                                    </label>
+                                    <div class="help-text">Enables the use of weighted syntax (e.g., "(word:1.1)") in captions for precise control over the importance of specific terms.</div>
+                                </div>
+                                <div class="form-group">
+                                    <label>Default Emphasis</label>
+                                    <input type="number" name="emphasis_strength" value="1.2" step="0.05" min="0.1" max="3">
+                                    <div class="help-text">The default multiplier applied to emphasized tags when no explicit weight is provided.</div>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Default De-Emphasis</label>
+                                    <input type="number" name="de_emphasis_strength" value="0.8" step="0.05" min="0.1" max="3">
+                                    <div class="help-text">The default multiplier applied to de-emphasized tags when no explicit weight is provided.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Augmentation & Caching Config -->
+                        <div id="cfg-aug" class="sub-tab-content">
+                            <div class="field-title">Caching</div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="checkbox-label" data-pointer="cache_latents">
+                                        <input type="checkbox" name="cache_latents" checked>
+                                        Cache Latents to RAM
+                                    </label>
+                                    <div class="help-text">
+                                        Precomputes VAE latents to significantly increase training speed (often 2x-3x). When enabled, all latents are cached and remain in RAM throughout training. This disables certain real-time augmentations.
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="checkbox-label" data-pointer="cache_latents_disk">
+                                        <input type="checkbox" name="cache_latents_to_disk">
+                                        Cache Latents to Disk
+                                    </label>
+                                    <div class="help-text">Saves precomputed latents to disk to conserve RAM. Note that slow disk I/O can negatively impact training performance. These latents will be reused in training sessions. If dataset changes, you have to delete the old latents manually from cache.</div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="cache_text_embeddings">
+                                    Cache Text Embeddings
+                                </label>
+                                <div class="help-text">Precomputes text embeddings to improve training speed. This setting is incompatible with active Text Encoder training.</div>
+                            </div>
+                            <div class="form-group">
+                                <label data-pointer="vae_batch">VAE Batch Size</label>
+                                <input type="number" name="vae_batch_size" placeholder="Optional">
+                                <div class="help-text">The batch size used for VAE encoding during the caching process. Higher values increase speed but require more VRAM.</div>
+                            </div>
+
+                            <div class="field-title" style="margin-top: 16px;">Noise & Augmentation</div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Noise Offset Strength</label>
+                                    <input type="number" name="noise_offset_strength" value="0" step="0.01">
+                                    <div class="help-text">Adds an offset to the noise during training, which helps the model generate images with better dynamic range (deeper blacks and brighter whites). A value of 0.05-0.1 is generally recommended.</div>
+                                </div>
+                                <div class="form-group">
+                                    <label>Noise Offset Random Strength</label>
+                                    <input type="number" name="noise_offset_random_strength" value="0" step="0.01">
+                                    <div class="help-text">Randomizes the strength of the noise offset for each training step.</div>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Noise Offset Type</label>
+                                    <select name="noise_offset_type">
+                                        <option value="original">Original</option>
+                                        <option value="alternative">Alternative</option>
+                                    </select>
+                                    <div class="help-text">The mathematical method used to calculate noise offset. "Original" is the standard implementation.</div>
+                                </div>
+                                <div class="form-group">
+                                    <label>Adaptive Noise Scale</label>
+                                    <input type="number" name="adaptive_noise_scale" value="0" step="0.01">
+                                    <div class="help-text">Scales the noise based on the model's prediction error during training.</div>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Multires Noise Iter</label>
+                                    <input type="number" name="multires_noise_iterations" value="0">
+                                    <div class="help-text">Applies multi-resolution noise to improve the learning of fine textures and details.</div>
+                                </div>
+                                <div class="form-group">
+                                    <label>Multires Noise Discount</label>
+                                    <input type="number" name="multires_noise_discount" value="0" step="0.1">
+                                    <div class="help-text">The discount factor applied to multi-resolution noise iterations.</div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="do_edm_style_training">
+                                    EDM-Style Training (SDXL)
+                                </label>
+                                <div class="help-text">Uses the EDM (Elucidating the Design Space of Diffusion-Based Generative Models) formulation, which can result in higher quality outputs for SDXL models.</div>
+                            </div>
+
+                            <div class="field-title" style="margin-top: 16px;">Image Augmentation (Training-Time)</div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label data-pointer="aug_mode">Augmentation Mode</label>
+                                    <select name="augmentation_mode">
+                                        <option value="always">Always</option>
+                                        <option value="per_epoch">Per Epoch Only</option>
+                                        <option value="random">Random Probability</option>
+                                    </select>
+                                    <div class="help-text">
+                                        Decides when augmentations kick in during training.
+                                        <strong>Always:</strong> Every image gets augmented on every step — maximum variety, though it can slow things down a bit.
+                                        <strong>Per Epoch Only:</strong> New augmentations are rolled once per epoch and stay consistent within that pass. 
+                                        Keeps things stable while still mixing it up between epochs.
+                                        <strong>Random Probability:</strong> Each image might or might not get augmented on any given step, 
+                                        based on individual settings like 
+                                        <a href="#" class="xref-link" data-xref="flip_aug_probability" data-xref-label="Flip Aug Probability" data-xref-tab="training" data-xref-subtab="cfg-aug">Flip Aug Probability</a>.
+                                        Most of the time, "Always" or "Per Epoch Only" will do the trick.
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label data-pointer="color_aug_strength">Color Aug Strength</label>
+                                    <input type="number" name="color_aug_strength" value="0.5" step="0.1" min="0" max="1">
+                                    <div class="help-text">
+                                        How aggressively to jitter colors (hue, saturation, brightness) during training.
+                                        <strong>0.0:</strong> Colors stay exactly as-is — no tampering.
+                                        <strong>0.3-0.5:</strong> Gentle variation, works great for most datasets and helps the model not memorize exact colors.
+                                        <strong>0.7-1.0:</strong> Heavy color shifts. Can produce weird combos but really pushes generalization.
+                                        This is especially handy for character or style LoRAs where you want the model to nail shapes and concepts 
+                                        without getting stuck on particular palettes. Turn it off if color fidelity matters (brand colors, specific outfits, etc.).
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label data-pointer="flip_aug_probability">Flip Aug Probability</label>
+                                    <input type="number" name="flip_aug_probability" value="0.5" step="0.1" min="0" max="1">
+                                    <div class="help-text">
+                                        Chance of flipping each image horizontally.
+                                        <strong>0.5</strong> = 50/50 coin flip, essentially doubling your dataset with mirrored versions.
+                                        <strong>0.0</strong> = no flipping whatsoever.
+                                        <strong>Heads up:</strong> Set this to 0 if your images have:
+                                        • <strong>Text or logos</strong> (would be backwards)
+                                        • <strong>Asymmetric stuff</strong> (cars, faces with a distinctive side)
+                                        • <strong>Directional content</strong> (left vs right hands, specific poses)
+                                        Works great for symmetric subjects like centered portraits, abstract art, or many anime characters.
+                                        One of the best tricks against overfitting on small datasets.
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label data-pointer="random_crop_scale">Random Crop Scale</label>
+                                    <input type="number" name="random_crop_scale" value="1.0" step="0.05" min="0.5" max="1.0">
+                                    <div class="help-text">
+                                        Minimum zoom level for random cropping.
+                                        <strong>1.0:</strong> No cropping — images stay at full size.
+                                        <strong>0.8:</strong> Crops anywhere between 80-100%, giving subtle zoom variations.
+                                        <strong>0.5:</strong> More dramatic — can zoom in up to 2×, showing the model wildly different framings.
+                                        Cropping teaches the model to handle subjects at various scales and compositions. 
+                                        Super useful if your dataset is all "perfectly centered headshots" but you want more flexibility in outputs.
+                                        Keep at 1.0 if exact framing matters.
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="field-title" style="margin-top: 16px;">Caption Augmentation</div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label data-pointer="caption_dropout_rate">Dropout Rate</label>
+                                    <input type="number" name="caption_dropout_rate" value="0.0" step="0.1">
+                                    <div class="help-text">
+                                        Probability of completely dropping an image's caption (replacing it with nothing).
+                                        When captions vanish, the model has to figure out the image purely from visuals — this trains unconditional generation.
+                                        <strong>0.0:</strong> Captions always present.
+                                        <strong>0.05-0.1:</strong> Light dropout, gently improves what happens when users give empty or weak prompts.
+                                        <strong>0.15-0.2:</strong> More aggressive — really pushes unconditional quality.
+                                        Dropout helps CFG (classifier-free guidance) work better at inference time, since the model actually knows 
+                                        what "no prompt" looks like. But for LoRA training where prompt adherence is king, too much dropout can backfire.
+                                        A tiny bit (0.05) often helps; skip it entirely for very short training runs.
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label data-pointer="caption_dropout_every_n_epochs">Dropout Every N Epochs</label>
+                                    <input type="number" name="caption_dropout_every_n_epochs" value="0">
+                                    <div class="help-text">
+                                        Instead of random dropout per step, this drops captions on specific epochs.
+                                        <strong>0:</strong> Falls back to the normal random 
+                                        <a href="#" class="xref-link" data-xref="caption_dropout_rate" data-xref-label="Dropout Rate" data-xref-tab="training" data-xref-subtab="cfg-aug">Dropout Rate</a> behavior.
+                                        <strong>1:</strong> Every single epoch is captionless (pretty extreme).
+                                        <strong>5:</strong> Epochs 5, 10, 15... go without captions.
+                                        This gives you a more structured pattern — normal training most of the time, with periodic "blind" epochs. 
+                                        Useful for specific curricula, but random per-step dropout is more common in practice.
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label data-pointer="keep_tokens">Keep Tokens</label>
+                                    <input type="number" name="keep_tokens" value="0">
+                                    <div class="help-text">
+                                        How many tokens at the start of each caption are "sacred" and won't get shuffled.
+                                        <strong>0:</strong> Everything's fair game for shuffling.
+                                        <strong>1:</strong> First token (usually your trigger word) always stays first.
+                                        <strong>2-3:</strong> Protects "trigger, character_name" style patterns.
+                                        If your captions look like "mytrigger, blonde hair, blue eyes, ...", setting this to 1 keeps "mytrigger" 
+                                        anchored at the front while the rest gets randomized. Helps the model lock onto the trigger-concept association 
+                                        without memorizing exact tag orders.
+                                        Only matters when <a href="#" class="xref-link" data-xref="shuffle_caption_checkbox" data-xref-label="Shuffle Captions" data-xref-tab="training" data-xref-subtab="cfg-aug">Shuffle Captions</a> is enabled.
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="checkbox-label" data-pointer="shuffle_caption_checkbox" style="margin-top: 30px;">
+                                        <input type="checkbox" name="shuffle_caption" id="shuffle_caption_checkbox">
+                                        Shuffle Captions
+                                    </label>
+                                    <div class="help-text">
+                                        Randomizes the order of tags/words in captions each time they're used.
+                                        Stops the model from memorizing fixed patterns like "blue eyes always comes before long hair" — 
+                                        instead, it learns that these tags can appear anywhere.
+                                        Perfect for booru-style comma-separated tags where order is meaningless.
+                                        Use <a href="#" class="xref-link" data-xref="keep_tokens" data-xref-label="Keep Tokens" data-xref-tab="training" data-xref-subtab="cfg-aug">Keep Tokens</a> if you need the trigger word to stay put.
+                                        <strong>Don't use this</strong> for natural language captions where word order carries meaning 
+                                        ("woman holding cat" ≠ "cat holding woman").
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Basic (Learning) Config -->
+                        <div id="cfg-basic" class="sub-tab-content">
+                            <div class="form-group">
+                                <label data-pointer="learning_rate">Learning Rate</label>
+                                <input type="number" name="learning_rate" value="0.0001" step="0.00001">
+                                <div class="help-text">
+                                    The single most impactful setting in your entire training run. This determines how aggressively 
+                                    the model adjusts its weights each step.
+                                    <strong>Too high</strong> (like 1e-3 or more) and you'll fry your model — expect artifacts, noise, or complete collapse.
+                                    <strong>Too low</strong> (like 1e-6 or less) and training will crawl or go nowhere at all.
+                                    <strong>Where to start:</strong>
+                                    - <strong>LoRA/LyCORIS:</strong> 1e-4 to 5e-4 is the sweet spot
+                                    - <strong>Full finetune:</strong> go much lower, around 1e-6 to 1e-5
+                                    - <strong>Prodigy/DAdaptAdam:</strong> just use 1.0 and let the optimizer figure it out
+                                    The "perfect" value depends on batch size, dataset, and your setup.
+                                    Bigger effective batches (via <a href="#" class="xref-link" data-xref="grad_acc" data-xref-label="Gradient Accumulation" data-xref-tab="training" data-xref-subtab="cfg-advanced">Gradient Accumulation</a>) 
+                                    usually handle higher learning rates gracefully.
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label data-pointer="unet_lr">UNet LR</label>
+                                    <input type="number" name="unet_lr" placeholder="Same as LR" step="0.00001">
+                                    <div class="help-text">
+                                        Override the learning rate just for the UNet — that's the core image generation engine.
+                                        Leave blank to use the global <a href="#" class="xref-link" data-xref="learning_rate" data-xref-label="Learning Rate" data-xref-tab="training" data-xref-subtab="cfg-basic">Learning Rate</a> setting.
+                                        Splitting rates between UNet and Text Encoder gives you precise control over what learns faster.
+                                        The UNet handles all your visuals (style, composition, structure), so this directly affects 
+                                        how quickly the "look" of your training subject gets baked in.
+                                        Honestly, same rate for both usually works fine — only split if you know what you're doing.
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label data-pointer="text_encoder_lr">Text Encoder LR</label>
+                                    <input type="number" name="text_encoder_lr" placeholder="Same as LR" step="0.00001">
+                                    <div class="help-text">
+                                        Learning rate specifically for the Text Encoder (CLIP or T5, depending on your base model).
+                                        This component translates your text prompts into something the image generator understands.
+                                        Common wisdom: use about <strong>1/10th to 1/2</strong> of the UNet rate, or just turn it off entirely (set to 0).
+                                        <strong>Training it:</strong> Helps the model recognize new concepts, names, and respond better to your style-specific prompts.
+                                        <strong>Skipping it (0):</strong> Keeps the base model's language understanding intact — good when you only care about visual style.
+                                        For LoRA work, half of <a href="#" class="xref-link" data-xref="unet_lr" data-xref-label="UNet LR" data-xref-tab="training" data-xref-subtab="cfg-basic">UNet LR</a> is a solid starting point.
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label data-pointer="lr_scheduler">LR Scheduler</label>
+                                <select name="lr_scheduler">
+                                    <option value="constant">constant</option>
+                                    <option value="cosine">cosine</option>
+                                    <option value="cosine_with_restarts">cosine_with_restarts</option>
+                                    <option value="linear">linear</option>
+                                    <option value="polynomial">polynomial</option>
+                                    <option value="constant_with_warmup">constant_with_warmup</option>
+                                </select>
+                                <div class="help-text">
+                                    Dictates how your learning rate evolves over the course of training. This can make or break your results.
+                                    <strong>constant:</strong> Stays flat the whole way. Simple, predictable — works great for short runs.
+                                    <strong>cosine:</strong> Starts strong, then smoothly tapers off following a cosine curve. 
+                                    Popular choice because it pushes learning early and refines gently at the end.
+                                    <strong>cosine_with_restarts:</strong> Same cosine idea, but periodically kicks the LR back up. 
+                                    Can help escape local minima. Set restart count with 
+                                    <a href="#" class="xref-link" data-xref="lr_scheduler_num_cycles" data-xref-label="LR Scheduler Cycles" data-xref-tab="training" data-xref-subtab="cfg-basic">LR Scheduler Cycles</a>.
+                                    <strong>linear:</strong> Straight line from starting LR down to zero. Simple and effective.
+                                    <strong>polynomial:</strong> Decays based on a power function. Tweak behavior with 
+                                    <a href="#" class="xref-link" data-xref="lr_scheduler_power" data-xref-label="LR Scheduler Power" data-xref-tab="training" data-xref-subtab="cfg-basic">LR Scheduler Power</a>.
+                                    <strong>constant_with_warmup:</strong> Ramps up from zero, then holds steady. Pair with 
+                                    <a href="#" class="xref-link" data-xref="warmup_steps" data-xref-label="Warmup Steps" data-xref-tab="training" data-xref-subtab="cfg-basic">Warmup Steps</a> for smooth starts.
+                                    For most LoRA jobs, <strong>constant</strong> or <strong>cosine</strong> will serve you well.
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label data-pointer="warmup_steps">Warmup Steps</label>
+                                <input type="number" name="lr_warmup_steps" value="0">
+                                <div class="help-text">
+                                    How many steps to spend gently ramping the learning rate from zero up to its target value.
+                                    Think of it like warming up before exercise — prevents the model from getting shocked by sudden large gradients 
+                                    when weights are still way off from optimal.
+                                    <strong>0</strong> = no warmup, jump straight to full LR.
+                                    <strong>10-100 steps</strong> is usually plenty for LoRA training.
+                                    <strong>100-500 steps</strong> might help with full finetuning or when using big batches.
+                                    You can also use <a href="#" class="xref-link" data-xref="lr_warmup_ratio" data-xref-label="Warmup Ratio" data-xref-tab="training" data-xref-subtab="cfg-basic">Warmup Ratio</a> 
+                                    to specify this as a percentage of total steps instead.
+                                    Especially useful with high learning rates or adaptive optimizers like 
+                                    <a href="#" class="xref-link" data-xref="optimizer" data-xref-label="Optimizer" data-xref-tab="training" data-xref-subtab="cfg-basic">Prodigy or DAdaptAdam</a>.
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label data-pointer="lr_scheduler_num_cycles">LR Scheduler Cycles</label>
+                                    <input type="number" name="lr_scheduler_num_cycles" value="1">
+                                    <div class="help-text">
+                                        How many complete up-and-down cycles to run when using 
+                                        <a href="#" class="xref-link" data-xref="lr_scheduler" data-xref-label="LR Scheduler" data-xref-tab="training" data-xref-subtab="cfg-basic">cosine_with_restarts</a>.
+                                        Each cycle drops the LR to minimum then kicks it back up (usually to a lower peak than before).
+                                        <strong>1</strong> = one cycle across all training, basically the same as regular cosine.
+                                        <strong>2-4</strong> cycles can shake the model out of local minima and explore the loss landscape better.
+                                        More cycles = more "restarts" = better exploration but potentially less stable near the end.
+                                        Only matters if you're using cosine_with_restarts.
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label data-pointer="lr_scheduler_power">LR Scheduler Power</label>
+                                    <input type="number" name="lr_scheduler_power" value="1.0" step="0.1">
+                                    <div class="help-text">
+                                        The exponent when using <a href="#" class="xref-link" data-xref="lr_scheduler" data-xref-label="LR Scheduler" data-xref-tab="training" data-xref-subtab="cfg-basic">polynomial scheduler</a>.
+                                        Shapes how aggressively the LR drops off.
+                                        <strong>1.0</strong> = linear decay, nothing fancy.
+                                        <strong>> 1.0</strong> (like 2.0) = fast drop early, slows down later.
+                                        <strong>< 1.0</strong> (like 0.5) = slow drop early, faster toward the end.
+                                        Only does anything with polynomial scheduler selected. Default 1.0 is fine for most cases.
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label data-pointer="lr_warmup_ratio">Warmup Ratio</label>
+                                <input type="number" name="lr_warmup_ratio" value="0.0" step="0.01">
+                                <div class="help-text">
+                                    Alternative to <a href="#" class="xref-link" data-xref="warmup_steps" data-xref-label="Warmup Steps" data-xref-tab="training" data-xref-subtab="cfg-basic">Warmup Steps</a> — 
+                                    specify warmup as a fraction of total training instead of an exact step count.
+                                    <strong>0.0</strong> = no warmup.
+                                    <strong>0.05</strong> = warmup over the first 5% of training.
+                                    <strong>0.1</strong> = warmup over the first 10% of training.
+                                    Way more convenient than counting steps manually since it scales automatically with your training length.
+                                    If you set both this and warmup_steps, this one wins.
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label data-pointer="optimizer">Optimizer</label>
+                                <select name="optimizer_type">
+                                    <option value="AdamW8bit">AdamW8bit (Memory-efficient)</option>
+                                    <option value="AdamW">AdamW (Stable)</option>
+                                    <option value="Lion">Lion (Experimental)</option>
+                                    <option value="Lion8bit">Lion8bit (Experimental, Low Memory)</option>
+                                    <option value="DAdaptAdam">DAdaptAdam (Adaptive LR)</option>
+                                    <option value="Prodigy">Prodigy (Advanced)</option>
+                                    <option value="CAME">CAME (Experimental)</option>
+                                    <option value="Adafactor">Adafactor (Low mem, T5-style)</option>
+                                    <option value="SGD">SGD (Simple)</option>
+                                </select>
+                                <div class="help-text">
+                                    The algorithm that actually updates your weights based on gradients. Different optimizers have different strengths.
+                                    <strong>AdamW8bit:</strong> Memory-efficient 8-bit version of the classic. Uses ~50% less optimizer state memory. 
+                                    Go-to choice for most LoRA training when VRAM is tight. Needs the bitsandbytes library.
+                                    <strong>AdamW:</strong> The original, full precision. Most stable and battle-tested. 
+                                    Pick this if you've got VRAM to spare or hit issues with the 8-bit version.
+                                    <strong>Lion / Lion8bit:</strong> Newer hotness — often needs much lower LR (3-10× lower than AdamW). 
+                                    Can give good results with less memory, but still somewhat experimental.
+                                    <strong>DAdaptAdam:</strong> Self-adjusting optimizer. Set your 
+                                    <a href="#" class="xref-link" data-xref="learning_rate" data-xref-label="Learning Rate" data-xref-tab="training" data-xref-subtab="cfg-basic">Learning Rate</a> to 1.0 and let it find the sweet spot.
+                                    <strong>Prodigy:</strong> Another smart adaptive optimizer. Also use LR=1.0. Often produces excellent results hands-free.
+                                    <strong>CAME:</strong> Experimental, decent memory efficiency.
+                                    <strong>Adafactor:</strong> Super memory-friendly, originally built for huge language models. Last resort for extreme VRAM constraints.
+                                    <strong>SGD:</strong> Basic gradient descent. Rarely used for diffusion stuff but it's here if you want to experiment.
+                                    Fine-tune behavior with <a href="#" class="xref-link" data-xref="optimizer_args" data-xref-label="Optimizer Args" data-xref-tab="training" data-xref-subtab="cfg-basic">Optimizer Args</a>.
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="checkbox-label" data-pointer="ema_unet_checkbox">
+                                    <input type="checkbox" name="ema_unet" id="ema_unet_checkbox">
+                                    EMA for UNet
+                                </label>
+                                <div class="help-text">
+                                    Keeps a running average of UNet weights during training.
+                                    Instead of using the raw weights from the last step (which can be noisy), EMA gives you a 
+                                    "smoothed" version that typically looks better and generalizes more reliably.
+                                    Think of it as noise reduction for your model weights — the EMA checkpoint often outperforms the raw one.
+                                    The catch: it doubles VRAM usage for UNet weights (you're storing both sets).
+                                    Smoothing rate controlled by <a href="#" class="xref-link" data-xref="ema_decay" data-xref-label="EMA Decay" data-xref-tab="training" data-xref-subtab="cfg-basic">EMA Decay</a>.
+                                    Strongly recommended for longer training runs if your VRAM can handle it.
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="checkbox-label" data-pointer="ema_text_encoder_checkbox">
+                                    <input type="checkbox" name="ema_text_encoder" id="ema_text_encoder_checkbox">
+                                    EMA for Text Encoder
+                                </label>
+                                <div class="help-text">
+                                    Same idea as <a href="#" class="xref-link" data-xref="ema_unet_checkbox" data-xref-label="EMA for UNet" data-xref-tab="training" data-xref-subtab="cfg-basic">UNet EMA</a>, 
+                                    but for the text encoder instead.
+                                    Less critical than UNet EMA since text encoder weights usually shift more gently during LoRA training.
+                                    Still adds VRAM overhead for storing the extra weights.
+                                    Turn this on if you're training the text encoder and want the absolute best quality.
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label data-pointer="ema_decay">EMA Decay</label>
+                                <input type="number" name="ema_decay" value="0.995" step="0.0005" min="0.9" max="0.9999">
+                                <div class="help-text">
+                                    How much the EMA "remembers" old weights vs. new: <code>ema = decay × ema + (1-decay) × current</code>.
+                                    <strong>Higher (0.999-0.9999):</strong> More smoothing, slower to pick up changes. Good for long training runs.
+                                    <strong>Lower (0.99-0.995):</strong> Less smoothing, reacts faster to new weights. Better for short runs.
+                                    <strong>0.995</strong> works well for typical LoRA training (hundreds to a few thousand steps).
+                                    Doing tens of thousands of steps? Try <strong>0.9999</strong>.
+                                    Only matters if <a href="#" class="xref-link" data-xref="ema_unet_checkbox" data-xref-label="EMA for UNet" data-xref-tab="training" data-xref-subtab="cfg-basic">EMA for UNet</a> 
+                                    or <a href="#" class="xref-link" data-xref="ema_text_encoder_checkbox" data-xref-label="EMA for Text Encoder" data-xref-tab="training" data-xref-subtab="cfg-basic">EMA for Text Encoder</a> is on.
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label data-pointer="optimizer_args">Optimizer Args</label>
+                                <input type="text" name="optimizer_args" placeholder="Comma separated args (e.g. weight_decay=0.01)">
+                                <div class="help-text">
+                                    Extra tweaks passed straight to your <a href="#" class="xref-link" data-xref="optimizer" data-xref-label="Optimizer" data-xref-tab="training" data-xref-subtab="cfg-basic">optimizer</a>.
+                                    Format: <code>key=value</code>, comma-separated. Some examples:
+                                    <strong>weight_decay=0.01</strong> — L2 regularization to fight overfitting (common with AdamW).
+                                    <strong>betas=(0.9,0.999)</strong> — Adam momentum coefficients.
+                                    <strong>d_coef=1.0</strong> — D-coefficient for Prodigy/DAdaptAdam.
+                                    <strong>eps=1e-8</strong> — Tiny number for numerical stability.
+                                    Defaults are solid for most training. Only mess with these if you're following a specific guide 
+                                    or you really know what you're doing.
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Advanced Config -->
+                        <div id="cfg-advanced" class="sub-tab-content">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label data-pointer="mixed_precision">Mixed Precision</label>
+                                    <select name="mixed_precision">
+                                        <option value="fp16">fp16</option>
+                                        <option value="bf16">bf16</option>
+                                        <option value="fp8">fp8</option>
+                                        <option value="no">no</option>
+                                    </select>
+                                    <div class="help-text">
+                                        Numerical precision for calculations — directly impacts VRAM and speed.
+                                        <strong>fp16:</strong> Half-precision floats, cuts memory in half compared to full precision. 
+                                        Solid choice for GTX 10-series and RTX 20-series cards, though SDXL can sometimes throw NaN errors due to fp16's limited range.
+                                        <strong>bf16:</strong> Also 16 bits but with better range for exponents — much more stable. 
+                                        Definitely use this on RTX 30-series and newer. Won't work on older hardware.
+                                        <strong>fp8:</strong> 8-bit precision for extreme memory savings. Experimental and may hurt quality. Needs specific hardware.
+                                        <strong>no:</strong> Full fp32 precision. Eats 2× the VRAM but rock-solid numerically. 
+                                        Only use for debugging NaN issues or if you've got VRAM to burn.
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label data-pointer="grad_acc">Gradient Acc. Steps</label>
+                                    <input type="number" name="gradient_accumulation_steps" value="1">
+                                    <div class="help-text">
+                                        Stacks up gradients over multiple passes before updating weights — essentially fakes a bigger batch size.
+                                        Your <strong>effective batch = batch_size × gradient_accumulation</strong>.
+                                        So batch_size=2 with accumulation=4 acts like batch_size=8.
+                                        This is a lifesaver for VRAM-starved systems: can't fit batch=8? Do batch=2 with accumulation=4 instead.
+                                        Bigger effective batches mean more stable training, but you might need to tweak your 
+                                        <a href="#" class="xref-link" data-xref="learning_rate" data-xref-label="Learning Rate" data-xref-tab="training" data-xref-subtab="cfg-basic">learning rate</a>.
+                                        Downside: slows things down proportionally (4× accumulation = 4× slower per effective step).
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label data-pointer="attention_backend">Attention Backend</label>
+                                    <select id="attention_backend" name="attention_backend">
+                                        <option value="sdpa">SDPA (PyTorch 2.0+ Default)</option>
+                                        <option value="xformers">xFormers (Fastest, requires install)</option>
+                                        <option value="none">None (Slowest, most compatible)</option>
+                                    </select>
+                                    <div class="help-text">
+                                        Which implementation handles the attention mechanism — the most memory-hungry part of transformers.
+                                        <strong>SDPA:</strong> PyTorch's built-in optimized attention (requires PyTorch 2.0+). 
+                                        Good balance of speed and memory, no extra installs. Recommended default.
+                                        <strong>xFormers:</strong> Meta's attention library, often the fastest option on NVIDIA cards. 
+                                        Can slash VRAM by 20-40% compared to vanilla attention. Needs separate installation.
+                                        <strong>None:</strong> Plain PyTorch attention — eats more memory but works everywhere. 
+                                        Only fall back to this if SDPA or xFormers are giving you trouble.
+                                        Both SDPA and xFormers play nicely with 
+                                        <a href="#" class="xref-link" data-xref="enable_aggressive_memory_saving" data-xref-label="Aggressive Memory Saving" data-xref-tab="training" data-xref-subtab="cfg-advanced">Aggressive Memory Saving</a>.
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label data-pointer="allow_tf32">Allow TF32 (Ampere+)</label>
+                                    <select name="allow_tf32">
+                                        <option value="true" selected>Enabled</option>
+                                        <option value="false">Disabled</option>
+                                    </select>
+                                    <div class="help-text">
+                                        TensorFloat-32 — a compute mode exclusive to RTX 30-series and newer.
+                                        Uses fp32 range but with less mantissa precision (10 bits instead of 23), giving you 
+                                        up to 8× speedup on some operations with barely any quality difference for ML workloads.
+                                        <strong>Always leave this on for RTX 30-series and 40-series cards.</strong>
+                                        Does nothing on older GPUs (GTX 10-series, RTX 20-series) since they don't have the hardware for it.
+                                        Only turn off if you suspect TF32 is somehow tanking quality (super rare).
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label data-pointer="enable_aggressive_memory_saving">Aggressive Memory Saving</label>
+                                    <select id="enable_aggressive_memory_saving" name="enable_aggressive_memory_saving">
+                                        <option value="false">Disabled (Faster training)</option>
+                                        <option value="true">Enabled (Extra VRAM savings)</option>
+                                    </select>
+                                    <div class="help-text">
+                                        Throws everything at VRAM savings: gradient checkpointing, CPU offloading, aggressive garbage collection.
+                                        <strong>A must-have for 4GB-8GB cards</strong> — lets you train SDXL on hardware that would otherwise choke.
+                                        Can cut VRAM usage by 30-50% depending on the model.
+                                        The price? Training becomes 2-4× slower due to recomputation and shuffling data between CPU and GPU.
+                                        Pairs well with a good <a href="#" class="xref-link" data-xref="attention_backend" data-xref-label="Attention Backend" data-xref-tab="training" data-xref-subtab="cfg-advanced">Attention Backend</a> 
+                                        (SDPA or xFormers) for maximum savings.
+                                        Got 16GB+ VRAM? Leave this off and enjoy faster training.
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label data-pointer="vae_batch_size">VAE Batch Size</label>
+                                    <input type="number" name="vae_batch_size" placeholder="Optional">
+                                    <div class="help-text">
+                                        Separate batch size just for VAE encoding — when images get converted to latent space before the UNet sees them.
+                                        Setting this lower than your main batch size can tame VRAM spikes during encoding.
+                                        Leave blank to match training batch size. Set to <strong>1</strong> for minimum VRAM at the cost of slower encoding.
+                                        Handy if you're OOMing specifically during the latent encoding phase.
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label data-pointer="seed">Seed</label>
+                                    <input type="number" name="seed" placeholder="Random">
+                                    <div class="help-text">
+                                        The random seed for all RNGs in training.
+                                        Pick a specific seed and you get <strong>reproducibility</strong>: same config + same seed = identical results 
+                                        (assuming same hardware and software).
+                                        Leave blank for random initialization — totally fine for everyday training.
+                                        Useful when A/B testing settings, hunting bugs, or sharing reproducible configs with others.
+                                        People often pick memorable numbers like <strong>42</strong>, <strong>1234</strong>, or <strong>0</strong>.
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label data-pointer="max_token_length">Max Token Length</label>
+                                <select name="max_token_length">
+                                    <option value="75">75</option>
+                                    <option value="150">150</option>
+                                    <option value="225">225</option>
+                                </select>
+                                <div class="help-text">
+                                    Maximum tokens (roughly words/subwords) allowed in captions.
+                                    CLIP's native context is <strong>77 tokens</strong> (75 usable + start/end markers).
+                                    <strong>75:</strong> Standard, handles most captions without issue.
+                                    <strong>150:</strong> Room for more detailed descriptions — good for complex scenes or thorough character breakdowns.
+                                    <strong>225:</strong> Very long, super-detailed captions. Eats significantly more VRAM and slows down processing.
+                                    Higher limits work through caption chunking techniques.
+                                    Bump up to <strong>150</strong> or <strong>225</strong> if your captions regularly exceed ~60-70 words 
+                                    and truncation is cutting off important info.
+                                </div>
+                            </div>
+                            
+                            <div class="field-title" style="margin-top: 16px;">Flow Matching / Weighting (Flux/SD3)</div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label data-pointer="weighting_scheme">Weighting Scheme</label>
+                                    <select name="weighting_scheme">
+                                        <option value="none">None (Uniform)</option>
+                                        <option value="logit_normal">Logit Normal</option>
+                                        <option value="mode">Mode</option>
+                                    </select>
+                                    <div class="help-text">
+                                        How timesteps are sampled during training for flow-matching models (Flux, SD3).
+                                        This decides which noise levels get more attention during training.
+                                        <strong>None (Uniform):</strong> Equal love for all noise levels. Safe default when you don't have specific needs.
+                                        <strong>Logit Normal:</strong> Bell-curve distribution centered on 
+                                        <a href="#" class="xref-link" data-xref="logit_mean" data-xref-label="Logit Mean" data-xref-tab="training" data-xref-subtab="cfg-advanced">Logit Mean</a> with width set by 
+                                        <a href="#" class="xref-link" data-xref="logit_std" data-xref-label="Logit Std" data-xref-tab="training" data-xref-subtab="cfg-advanced">Logit Std</a>. 
+                                        Lets you dial in exactly which timesteps matter most.
+                                        <strong>Mode:</strong> Focuses hard on a specific timestep, spread controlled by 
+                                        <a href="#" class="xref-link" data-xref="mode_scale" data-xref-label="Mode Scale" data-xref-tab="training" data-xref-subtab="cfg-advanced">Mode Scale</a>.
+                                        These only affect Flux and SD3 — does nothing for SD1.5 or SDXL (epsilon-prediction models).
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label data-pointer="guidance_scale">Guidance Scale</label>
+                                    <input type="number" name="guidance_scale" value="3.5" step="0.1">
+                                    <div class="help-text">
+                                        Classifier-free guidance for training Flux and SD3 models.
+                                        Tells the model how hard to stick to the text prompt during training.
+                                        <strong>3.5:</strong> Stability AI's recommended default for SD3, works great for Flux too.
+                                        <strong>Lower (1-2):</strong> More creative/varied outputs but might wander from the prompt.
+                                        <strong>Higher (5-7):</strong> Tighter prompt adherence but can look a bit stiff.
+                                        For SD1.5/SDXL, this typically isn't used — guidance only kicks in at inference time for those.
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label data-pointer="logit_mean">Logit Mean</label>
+                                    <input type="number" name="logit_mean" value="0.0" step="0.1">
+                                    <div class="help-text">
+                                        Where the logit-normal distribution peaks when using 
+                                        <a href="#" class="xref-link" data-xref="weighting_scheme" data-xref-label="Weighting Scheme" data-xref-tab="training" data-xref-subtab="cfg-advanced">Logit Normal weighting</a>.
+                                        <strong>0.0:</strong> Centers on the middle timestep (t=0.5).
+                                        <strong>Negative:</strong> Push focus toward noisier timesteps (coarse structure).
+                                        <strong>Positive:</strong> Push focus toward cleaner timesteps (fine details).
+                                        Tune this based on what part of the generation process matters most for your use case.
+                                        Only kicks in when Weighting Scheme = "Logit Normal".
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label data-pointer="logit_std">Logit Std</label>
+                                    <input type="number" name="logit_std" value="1.0" step="0.1">
+                                    <div class="help-text">
+                                        How spread out the logit-normal distribution is when using 
+                                        <a href="#" class="xref-link" data-xref="weighting_scheme" data-xref-label="Weighting Scheme" data-xref-tab="training" data-xref-subtab="cfg-advanced">Logit Normal weighting</a>.
+                                        <strong>Lower (0.5-0.8):</strong> Tight focus around 
+                                        <a href="#" class="xref-link" data-xref="logit_mean" data-xref-label="Logit Mean" data-xref-tab="training" data-xref-subtab="cfg-advanced">Logit Mean</a> — 
+                                        really zeros in on specific timesteps.
+                                        <strong>Higher (1.5-2.0):</strong> Spreads out more, approaching uniform sampling.
+                                        <strong>1.0:</strong> Balanced default. Only matters when Weighting Scheme = "Logit Normal".
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label data-pointer="mode_scale">Mode Scale</label>
+                                    <input type="number" name="mode_scale" value="1.29" step="0.01">
+                                    <div class="help-text">
+                                        How tightly the mode distribution clusters when using 
+                                        <a href="#" class="xref-link" data-xref="weighting_scheme" data-xref-label="Weighting Scheme" data-xref-tab="training" data-xref-subtab="cfg-advanced">Mode weighting</a>.
+                                        <strong>Lower:</strong> Samples spread across more timesteps.
+                                        <strong>Higher:</strong> Samples bunch up tighter around the mode.
+                                        <strong>1.29:</strong> The value from the original SD3 paper. Stick with it unless experimenting.
+                                        Only relevant when Weighting Scheme = "Mode".
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="field-title" style="margin-top: 16px;">Timestep Range</div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label data-pointer="min_timestep">Min Timestep</label>
+                                    <input type="number" name="min_timestep" placeholder="Default (0)">
+                                    <div class="help-text">
+                                        Floor for timestep sampling — keeps training in higher-noise territory.
+                                        Timesteps go from 0 (clean image) to ~1000 (pure noise).
+                                        Setting something like <strong>100</strong> stops the model from training on near-clean images. Good for:
+                                        - Focusing on rough structure when fine details don't matter
+                                        - Testing specific noise regimes
+                                        - Weird specialized training schedules
+                                        Leave blank for normal full-range training. Pairs with 
+                                        <a href="#" class="xref-link" data-xref="max_timestep" data-xref-label="Max Timestep" data-xref-tab="training" data-xref-subtab="cfg-advanced">Max Timestep</a> 
+                                        to carve out a custom range.
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label data-pointer="max_timestep">Max Timestep</label>
+                                    <input type="number" name="max_timestep" placeholder="Default (max)">
+                                    <div class="help-text">
+                                        Ceiling for timestep sampling — keeps training away from the noisiest levels.
+                                        Setting something like <strong>800</strong> skips training on maximum-noise timesteps. Useful for:
+                                        - Polishing fine details when coarse structure is already solid
+                                        - Finetuning while preserving the base model's high-noise behavior
+                                        - Experimental training approaches
+                                        Leave blank for normal full-range training.
+                                        Combined with <a href="#" class="xref-link" data-xref="min_timestep" data-xref-label="Min Timestep" data-xref-tab="training" data-xref-subtab="cfg-advanced">Min Timestep</a>, 
+                                        you can train on any subset of the noise schedule.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="field-title" style="margin-top: 16px;">Caption Settings</div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label data-pointer="caption_extension">Extension</label>
+                                    <input type="text" name="caption_extension" value=".txt">
+                                    <div class="help-text">
+                                        File extension for your caption files.
+                                        Default is <strong>.txt</strong> — so "image001.png" expects its caption in "image001.txt".
+                                        Supports whatever extension you want (.caption, .captions, .tags, etc.).
+                                        Caption file needs to live in the same folder as its image.
+                                        Change this if your captioning tool outputs something different.
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="checkbox-label" style="margin-top: 30px;">
+                                        <input type="checkbox" name="weighted_captions" id="weighted_captions_checkbox">
+                                        Weighted Captions
+                                    </label>
+                                    <div class="help-text">
+                                        Parses A1111-style weights in captions like "(important thing:1.3)" or "[less important:0.7]".
+                                        Lets you emphasize or de-emphasize specific words during training.
+                                        <strong>Weight > 1.0:</strong> Model pays more attention to those tokens.
+                                        <strong>Weight < 1.0:</strong> Model cares less about those tokens.
+                                        Great for fine-tuning what aspects of your captions matter most.
+                                        Turn this off if your captions use literal parentheses that aren't meant as weights.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="field-title" style="margin-top: 16px;">Noise & Loss Optimization</div>
+                            
+                            <!-- Quick Presets -->
+                            <div class="form-group" style="margin-bottom: 16px;">
+                                <label data-pointer="loss_presets">Quick Presets</label>
+                                <div class="preset-buttons" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                    <button type="button" class="btn btn-sm" onclick="applyLossPreset('default')" title="Standard training without special optimizations">Default</button>
+                                    <button type="button" class="btn btn-sm" onclick="applyLossPreset('balanced')" title="Balanced settings for most use cases">Balanced</button>
+                                    <button type="button" class="btn btn-sm" onclick="applyLossPreset('quality')" title="Maximum quality, may be slower">Quality</button>
+                                    <button type="button" class="btn btn-sm" onclick="applyLossPreset('dark_light')" title="Optimized for images with dark/light extremes">Dark/Light Fix</button>
+                                </div>
+                                <div class="help-text">
+                                    One-click optimization profiles for common scenarios. 
+                                    <strong>Default:</strong> Plain L2 loss, no frills. 
+                                    <strong>Balanced:</strong> Min-SNR Gamma + light noise offset — better quality without slowing you down. 
+                                    <strong>Quality:</strong> All optimizations cranked up, slightly slower but best results. 
+                                    <strong>Dark/Light Fix:</strong> Specifically tackles images with extreme darks or brights using noise offset + Zero Terminal SNR.
+                                    Feel free to tweak individual settings after picking a preset.
+                                </div>
+                            </div>
+
+                            <div id="dynamic-loss-fields"></div>
+                            
+                            <!-- Loss Type -->
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label data-pointer="loss_type">Loss Type</label>
+                                    <select name="loss_type" onchange="updateLossTypeUI()">
+                                        <option value="l2">L2 (MSE) - Standard</option>
+                                        <option value="huber">Huber - Robust to outliers</option>
+                                        <option value="smooth_l1">Smooth L1 - Very robust</option>
+                                    </select>
+                                    <div class="help-text">
+                                        Math function for measuring how wrong the model's predictions are.
+                                        <strong>L2 (MSE):</strong> The classic — squares errors so big mistakes get punished hard.
+                                        <strong>Huber:</strong> Best of both worlds — acts like L2 for small errors, switches to L1 for big ones. 
+                                        Shrugs off outliers like blurry or weird images in your dataset. 
+                                        Transition point set by <a href="#" class="xref-link" data-xref="huber_c" data-xref-label="Huber Delta" data-xref-tab="training" data-xref-subtab="cfg-advanced">Huber Delta (C)</a>.
+                                        <strong>Smooth L1:</strong> Similar vibe to Huber but with fixed thresholds. Super robust for messy datasets.
+                                        Pick Huber or Smooth L1 if your dataset quality is all over the place.
+                                    </div>
+                                </div>
+                                <div class="form-group" id="huber-c-group">
+                                    <label data-pointer="huber_c">Huber Delta (C)</label>
+                                    <input type="number" name="huber_c" value="0.1" step="0.01" min="0.01">
+                                    <div class="help-text">
+                                        Tuning knob for Huber loss — decides what counts as an "outlier" error.
+                                        <strong>Lower (0.01-0.05):</strong> Aggressive — treats more predictions as outliers.
+                                        <strong>Higher (0.1-0.5):</strong> Lenient — only extreme mistakes get the L1 treatment.
+                                        <strong>0.1:</strong> Default, works well for most mixed-quality datasets.
+                                        Only does anything when <a href="#" class="xref-link" data-xref="loss_type" data-xref-label="Loss Type" data-xref-tab="training" data-xref-subtab="cfg-advanced">Loss Type</a> is Huber.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- SNR Optimization -->
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label data-pointer="snr_gamma_input">
+                                        <span>Min-SNR Gamma</span>
+                                        <label class="auto-toggle" style="margin-left: 8px; font-weight: normal;">
+                                            <input type="checkbox" id="snr_gamma_auto" checked onchange="toggleAutoSNR()">
+                                            <span class="auto-label">Auto</span>
+                                        </label>
+                                    </label>
+                                    <input type="number" name="snr_gamma" id="snr_gamma_input" value="5" step="0.5" min="0" max="20" disabled>
+                                    <div class="help-text">
+                                        From the "Efficient Diffusion Training via Min-SNR Weighting Strategy" paper — 
+                                        fixes the problem where models overfit some timesteps while ignoring others.
+                                        Without this, quality tends to be inconsistent across different denoising stages.
+                                        The gamma value (<strong>5.0</strong> typically) sets the SNR clipping threshold.
+                                        <strong>Lower (1-3):</strong> Emphasizes high-noise timesteps (early denoising, coarse structure).
+                                        <strong>Higher (8-20):</strong> Emphasizes low-noise timesteps (final details, polish).
+                                        <strong>0:</strong> Turns Min-SNR off entirely.
+                                        Generally should be enabled — big quality boost with almost no performance cost.
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label data-pointer="v_pred_like_loss">
+                                        <span>V-Pred Like Loss</span>
+                                    </label>
+                                    <input type="number" name="v_pred_like_loss" value="0" step="0.05" min="0" max="1">
+                                    <div class="help-text">
+                                        Blends velocity-prediction behavior into standard noise prediction training.
+                                        Originally from v-prediction models (SD 2.x depth/inpainting) — can smooth out training and reduce artifacts.
+                                        <strong>0:</strong> Pure noise prediction, the standard approach.
+                                        <strong>1:</strong> Full velocity prediction mode.
+                                        <strong>0.1-0.2:</strong> Subtle v-pred influence while staying compatible with noise-pred base models.
+                                        Can help with smoother gradients and fewer artifacts in some cases.
+                                        Leave at <strong>0</strong> if things are already working well or you're not sure.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Noise Offset with Auto -->
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label data-pointer="noise_offset_input">
+                                        <span>Noise Offset</span>
+                                        <label class="auto-toggle" style="margin-left: 8px; font-weight: normal;">
+                                            <input type="checkbox" id="noise_offset_auto" onchange="toggleAutoNoiseOffset()">
+                                            <span class="auto-label">Auto</span>
+                                        </label>
+                                    </label>
+                                    <input type="number" name="noise_offset_strength" id="noise_offset_input" value="0" step="0.01" min="0" max="0.2">
+                                    <div class="help-text">
+                                        Adds a tiny constant offset to noise during training so the model can actually generate 
+                                        true blacks and true whites instead of washed-out grays.
+                                        Standard diffusion struggles with extreme dark/bright areas because the noise schedule doesn't cover them well.
+                                        <strong>0.035-0.05:</strong> Safe defaults, improve dark/light handling without side effects.
+                                        <strong>0.05-0.1:</strong> More aggressive push toward better extremes.
+                                        <strong>Above 0.1:</strong> Might destabilize training or cause color shifts.
+                                        Works best when paired with 
+                                        <a href="#" class="xref-link" data-xref="zero_terminal_snr_checkbox" data-xref-label="Zero Terminal SNR" data-xref-tab="training" data-xref-subtab="cfg-advanced">Zero Terminal SNR</a> — they complement each other.
+                                        Essential if your dataset has dark scenes, night shots, or high-contrast images.
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label data-pointer="ip_noise_gamma">IP Noise Gamma</label>
+                                    <input type="number" name="ip_noise_gamma" value="0" step="0.01" min="0" max="0.1">
+                                    <div class="help-text">
+                                        Input Perturbation Noise adds additional random noise to the input during training as a 
+                                        regularization trick — kind of like dropout but for images.
+                                        Helps prevent the model from memorizing specific details and improves generalization, 
+                                        especially on smaller datasets.
+                                        <strong>0.05:</strong> Light regularization, won't mess with your training.
+                                        <strong>Above 0.1:</strong> Might hurt quality by adding too much noise.
+                                        Keep at <strong>0</strong> for normal training, or bump up slightly if your model is memorizing 
+                                        individual images instead of learning concepts.
+                                        Independent from <a href="#" class="xref-link" data-xref="noise_offset_input" data-xref-label="Noise Offset" data-xref-tab="training" data-xref-subtab="cfg-advanced">Noise Offset</a> — 
+                                        you can stack them.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Advanced toggles in a compact grid -->
+                            <div class="form-group mt-2">
+                                <label data-pointer="advanced_loss_options">Advanced Loss Options</label>
+                                <div class="checkbox-grid">
+                                    <label class="checkbox-label compact" data-pointer="zero_terminal_snr_checkbox">
+                                        <input type="checkbox" name="zero_terminal_snr" id="zero_terminal_snr_checkbox">
+                                        <span>Zero Terminal SNR</span>
+                                        <span class="badge auto-badge" id="zsnr_auto_badge" style="display: none;">AUTO</span>
+                                    </label>
+                                    <label class="checkbox-label compact">
+                                        <input type="checkbox" name="debiased_estimation_loss" id="debiased_estimation_loss_checkbox">
+                                        <span>Debiased Estimation</span>
+                                    </label>
+                                    <label class="checkbox-label compact">
+                                        <input type="checkbox" name="scale_v_pred_loss_like_noise_pred" id="scale_v_pred_checkbox">
+                                        <span>Scale V-Pred Loss</span>
+                                    </label>
+                                    <label class="checkbox-label compact">
+                                        <input type="checkbox" name="masked_loss" id="masked_loss_checkbox">
+                                        <span>Masked Loss (Alpha)</span>
+                                    </label>
+                                </div>
+                                <div class="help-text">
+                                    <strong>Zero Terminal SNR:</strong> Tweaks the noise scheduler so the final timestep is pure noise (SNR = 0), 
+                                    which unlocks true black generation. Essential companion to 
+                                    <a href="#" class="xref-link" data-xref="noise_offset_input" data-xref-label="Noise Offset" data-xref-tab="training" data-xref-subtab="cfg-advanced">Noise Offset</a> — 
+                                    auto-enabled when using the Auto toggle. Without it, noise offset alone won't fully fix dark image issues. 
+                                    From the paper "Common Diffusion Noise Schedules and Sample Steps are Flawed".<br>
+                                    <strong>Debiased Estimation:</strong> Fixes the bias in timestep sampling where some get oversampled. 
+                                    Reweights the loss so all timesteps train evenly, improving overall quality. 
+                                    Works alongside <a href="#" class="xref-link" data-xref="snr_gamma_input" data-xref-label="Min-SNR Gamma" data-xref-tab="training" data-xref-subtab="cfg-advanced">Min-SNR Gamma</a> 
+                                    but tackles a different problem.<br>
+                                    <strong>Scale V-Pred Loss:</strong> Normalizes v-prediction loss to match noise-prediction magnitude. 
+                                    Mainly useful for v-pred base models (SD 2.x variants) or when using 
+                                    <a href="#" class="xref-link" data-xref="v_pred_like_loss" data-xref-label="V-Pred Like Loss" data-xref-tab="training" data-xref-subtab="cfg-advanced">V-Pred Like Loss</a>. 
+                                    Doesn't do much for standard SD 1.5 or SDXL (epsilon-prediction).<br>
+                                    <strong>Masked Loss (Alpha):</strong> Uses PNG alpha channels as training masks — 
+                                    model only learns from non-transparent pixels. Perfect for character/object training where you 
+                                    want to ignore backgrounds. <strong>Needs PNGs with proper alpha channels!</strong>
+                                </div>
+                            </div>
+
+                            <div class="field-title" style="margin-top: 16px;">Optimization</div>
+                            <div id="dynamic-optim-fields"></div>
+                        </div>
+
+                        <!-- Samples Config -->
+                        <div id="cfg-samples" class="sub-tab-content">
+                            <div class="field-title">Sample Generation Schedule</div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Sample Every N Steps</label>
+                                    <input type="number" name="sample_every_n_steps" placeholder="Optional">
+                                    <div class="help-text">Generates validation samples every N steps to provide visual feedback on training progress. Note that frequent sample generation can slightly increase total training time.</div>
+                                </div>
+                                <div class="form-group">
+                                    <label>Sample Every N Epochs</label>
+                                    <input type="number" name="sample_every_n_epochs" placeholder="Optional">
+                                    <div class="help-text">Generates validation samples at the end of every N epochs.</div>
+                                </div>
+                            </div>
+
+                            <div class="field-title" style="margin-top: 20px;">Sample Prompts</div>
+                            <div class="form-group">
+                                <label>Prompts</label>
+                                <textarea name="sample_prompts" rows="5" placeholder="One prompt per line, e.g.&#10;a person with red hair&#10;a cute cat&#10;an anime girl"></textarea>
+                                <div class="help-text">The prompts used for validation images to evaluate how well the model has learned the target concepts.</div>
+                            </div>
+                            <div class="form-group">
+                                <label>Negative Prompt (Optional)</label>
+                                <input type="text" name="sample_negative_prompt" placeholder="e.g. blurry, low quality, bad anatomy">
+                                <div class="help-text">The negative prompt applied during validation sample generation.</div>
+                            </div>
+
+                            <div class="field-title" style="margin-top: 20px;">Inference Settings</div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Sampler</label>
+                                    <select name="sample_sampler">
+                                        <option value="euler">Euler</option>
+                                        <option value="euler_a" selected>Euler A (recommended)</option>
+                                        <option value="ddim">DDIM</option>
+                                        <option value="pndm">PNDM</option>
+                                        <option value="lms">LMS</option>
+                                        <option value="heun">Heun</option>
+                                        <option value="dpm_2">DPM++ 2M</option>
+                                        <option value="dpm_2_a">DPM++ 2M Karras</option>
+                                        <option value="k_lms">K-LMS</option>
+                                    </select>
+                                    <div class="help-text">The sampler used for validation image generation. Euler A is generally recommended for its speed and quality.</div>
+                                </div>
+                                <div class="form-group">
+                                    <label>Inference Steps</label>
+                                    <div style="display: flex; gap: 8px; align-items: center;">
+                                        <input type="range" name="sample_num_inference_steps" min="10" max="50" value="20" style="flex: 1;">
+                                        <span id="sample_steps_value" style="min-width: 30px;">20</span>
+                                    </div>
+                                    <div class="help-text">The number of inference steps for validation samples. 20 steps is typically sufficient for evaluation.</div>
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Guidance Scale (CFG)</label>
+                                    <div style="display: flex; gap: 8px; align-items: center;">
+                                        <input type="range" name="sample_guidance_scale" min="0" max="20" step="0.5" value="7.5" style="flex: 1;">
+                                        <span id="sample_guidance_value" style="min-width: 30px;">7.5</span>
+                                    </div>
+                                    <div class="help-text">The Classifier-Free Guidance (CFG) scale for validation samples. A value of 7.5 is standard.</div>
+                                </div>
+                                <div class="form-group">
+                                    <label>Seed</label>
+                                    <input type="number" name="sample_seed" value="-1">
+                                    <div class="help-text">The random seed for validation sample generation.</div>
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Num Validation Images</label>
+                                    <input type="number" name="num_validation_images" value="4">
+                                    <div class="help-text">How many images per prompt.</div>
+                                </div>
+                            </div>
+
+                            <div class="field-title" style="margin-top: 24px;">Generated Samples</div>
+                            <div id="samples-gallery" class="samples-grid">
+                                <div class="gallery-placeholder">
+                                    <p>Samples will appear here during training</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Metadata Config -->
+                        <div id="cfg-meta" class="sub-tab-content">
+                            <div class="form-group">
+                                <label>Training Comment</label>
+                                <input type="text" name="training_comment" placeholder="Notes about this training...">
+                                <div class="help-text">Private notes saved in metadata.</div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Title</label>
+                                    <input type="text" name="metadata_title">
+                                    <div class="help-text">Public name of the LoRA.</div>
+                                </div>
+                                <div class="form-group">
+                                    <label>Author</label>
+                                    <input type="text" name="metadata_author">
+                                    <div class="help-text">Your name.</div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Description</label>
+                                <textarea name="metadata_description" rows="3" placeholder="Describe what this LoRA does..."></textarea>
+                                <div class="help-text">Public description.</div>
+                            </div>
+                            <div class="form-group">
+                                <label>License</label>
+                                <input type="text" name="metadata_license" placeholder="e.g. MIT, Creative Commons">
+                                <div class="help-text">Usage license.</div>
+                            </div>
+                            <div class="form-group">
+                                <label>Tags</label>
+                                <input type="text" name="metadata_tags" placeholder="Comma separated tags (e.g. anime, style, character)">
+                                <div class="help-text">Search tags.</div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Progress Section -->
+                <div class="card progress-section">
+                    <div class="control-bar">
+                        <button id="btn-toggle-train" class="btn-primary">Start Training</button>
+                        <div class="status-badge">
+                            <span class="status-dot" id="training-dot"></span>
+                            <span id="training-status">Idle</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DATASET TAB REMOVED -->
+
+            <!-- CONSOLE TAB -->
+            <div id="tab-console" class="tab-content">
+                <div class="page-header">
+                    <h1 class="page-title">Console</h1>
+                    <p class="page-subtitle">Real-time training logs and system output</p>
+                </div>
+
+                <div class="card">
+                    <!-- Stats Bar -->
+                    <div class="console-stats">
+                        <div class="stat-item">
+                            <span class="stat-label">Status</span>
+                            <span class="stat-value" id="console-status">Idle</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Step</span>
+                            <span class="stat-value" id="console-step">0 / 0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Loss</span>
+                            <span class="stat-value accent" id="console-loss">--</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">ETA</span>
+                            <span class="stat-value" id="console-eta">--:--:--</span>
+                        </div>
+                    </div>
+
+                    <!-- Progress Bar -->
+                    <div class="progress-container mb-2">
+                        <div class="progress-bar-bg">
+                            <div id="console-progress-fill" class="progress-bar-fill" style="width: 0%"></div>
+                        </div>
+                        <div class="progress-info">
+                            <span id="console-progress-text">0%</span>
+                            <span id="console-epoch-text">Epoch 0</span>
+                        </div>
+                    </div>
+
+                    <!-- System Stats Bar -->
+                    <div class="console-stats system-stats">
+                        <div class="stat-item">
+                            <span class="stat-label">GPU VRAM</span>
+                            <span class="stat-value" id="console-vram">--</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">GPU Load</span>
+                            <span class="stat-value" id="console-gpu-load">--</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">CPU Load</span>
+                            <span class="stat-value" id="console-cpu-load">--</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">RAM</span>
+                            <span class="stat-value" id="console-ram">--</span>
+                        </div>
+                    </div>
+
+                    <!-- Loss Chart -->
+                    <div class="progress-grid mb-2">
+                        <div class="chart-panel">
+                            <canvas id="loss-chart"></canvas>
+                            <div class="chart-overlay">
+                                <div class="label">LOSS</div>
+                                <div class="value" id="current-loss">--</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Full Console -->
+                    <div class="console-container">
+                        <div class="console-header">
+                            <span>Console Output</span>
+                            <button class="console-btn" onclick="clearConsole()">Clear</button>
+                        </div>
+                        <div class="console-output" id="console-log">
+                            <span class="console-line muted">Waiting for training to start...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- METADATA TAB -->
+            <div id="tab-metadata" class="tab-content">
+                <div class="page-header">
+                    <h1 class="page-title">Metadata Editor</h1>
+                    <p class="page-subtitle">Edit metadata for your trained models</p>
+                </div>
+                <div class="card">
+                    <div class="form-group">
+                        <label>Select File</label>
+                        <select id="meta-file-select">
+                            <option value="">-- Select a file --</option>
+                        </select>
+                        <div class="help-text">Select a <span class="mono">.safetensors</span> file from outputs/models to view and edit its embedded metadata.</div>
+                    </div>
+                    <button class="btn-secondary" onclick="loadMetadata()">Load Metadata</button>
+                    <div class="help-text" style="margin-top: 8px;">Load reads current metadata. Save writes metadata back into the file.</div>
+                    
+                    <div id="meta-editor-area" class="hidden mt-2">
+                        <div id="meta-fields"></div>
+                        <button class="btn-primary mt-2" onclick="saveMetadata()">Save Metadata</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CONVERSION TAB REMOVED -->
+            <!-- <div id="tab-conversion" class="tab-content">
+                <div class="page-header">
+                    <h1 class="page-title">Model Conversion</h1>
+                    <p class="page-subtitle">Convert LoRA models between formats (Diffusers &harr; Kohya/LDM)</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">Conversion Tool</div>
+                    <div class="help-text mb-2">
+                        Use this tool to fix compatibility issues with AUTOMATIC1111/Forge. 
+                        It converts "Diffusers" style keys (e.g. <span class="mono">lora_unet_down_blocks...</span>) 
+                        to "Kohya/LDM" style keys (e.g. <span class="mono">lora_unet_input_blocks...</span>).
+                    </div>
+
+                    <div class="form-group">
+                        <label>Input Model (.safetensors)</label>
+                        <div style="display: flex; gap: 8px;">
+                            <select id="conv_input_file" style="flex: 1;">
+                                <option value="">Select a file from outputs...</option>
+                            </select>
+                            <button class="btn-secondary" onclick="refreshConversionFiles()">Refresh</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Model Architecture</label>
+                        <select id="conv_model_type">
+                            <option value="sdxl">SDXL / Pony</option>
+                            <option value="sd1.5">SD 1.5 / 2.0</option>
+                            <option value="sd3">SD 3 / 3.5</option>
+                        </select>
+                        <div class="help-text">Specifies the architecture logic required for correct key mapping. Selecting the wrong architecture will result in a non-functional model.</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Target Format</label>
+                        <select id="conv_target_format">
+                            <option value="kohya">Kohya / LDM (for A1111, Forge, ComfyUI)</option>
+                            <!-- <option value="diffusers">Diffusers / PEFT (for Python scripts)</option> -->
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Output Filename (Optional)</label>
+                        <input type="text" id="conv_output_name" placeholder="Leave empty to auto-name (e.g. model_converted.safetensors)">
+                    </div>
+
+                    <button class="btn-primary" onclick="startConversion()">Convert Model</button>
+                    
+                    <div id="conv-result" class="mt-2 hidden">
+                        <div class="status-badge status-success">Conversion Successful!</div>
+                        <p class="mt-1 mono" id="conv-result-path" style="font-size: 12px;"></p>
+                    </div>
+                </div>
+            </div> -->
+
+        </main>
+    </div>
+
+    <!-- New Preset Modal -->
+    <div id="preset-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Create New Preset</h2>
+                <button class="modal-close" onclick="closePresetModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Preset Name</label>
+                    <input type="text" id="preset-name-input" placeholder="e.g. sdxl_character_v1">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closePresetModal()">Cancel</button>
+                <button class="btn-primary" onclick="saveNewPreset()">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Preset Confirmation Modal -->
+    <div id="delete-preset-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Delete Preset</h2>
+                <button class="modal-close" onclick="closeDeleteModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete the preset <strong id="delete-preset-name"></strong>?</p>
+                <p style="color: var(--text-muted); font-size: 12px; margin-top: 12px;">This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+                <button class="btn-danger" onclick="confirmDeletePreset()">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stop Training Confirmation Modal -->
+    <div id="stop-training-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Stop Training</h2>
+                <button class="modal-close" onclick="closeStopModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to stop training?</p>
+                <p style="color: var(--text-muted); font-size: 12px; margin-top: 12px;">Progress will be lost unless a checkpoint was saved.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeStopModal()">Cancel</button>
+                <button class="btn-danger" onclick="confirmStopTraining()">Stop Training</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/ui/app.js"></script>
+</body>
+</html>
