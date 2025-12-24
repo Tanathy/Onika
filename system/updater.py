@@ -11,13 +11,12 @@ from system.log import error, info, success, warning
 from system.coordinator_settings import SETTINGS
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
-REMOTE_CONFIG_PATH = "config/configs.json" # Changed from system_config.json to match Onika
+REMOTE_MANIFEST_PATH = "config/checksum.json"
 LOCAL_CHECKSUM_PATH = os.path.join(ROOT_DIR, "config", "checksum.json")
 DEFAULT_HEADERS = {"User-Agent": "Onika-Updater/1.0"}
 
 
 def _get_http_timeout() -> int:
-    # Default to 30 seconds if not specified
     return SETTINGS.get('http_timeout', 30)
 
 
@@ -94,22 +93,8 @@ def _http_get_json(url: str) -> Dict[str, Any]:
     return data
 
 
-def _fetch_remote_config() -> Dict[str, Any]:
-    url = f"{_get_remote_base_url()}{REMOTE_CONFIG_PATH}"
-    try:
-        return _http_get_json(url)
-    except UpdateError as exc:
-        raise UpdateError(f"Failed to fetch remote config: {exc}") from exc
-
-
-def _resolve_remote_checksum_path(remote_config: Dict[str, Any]) -> str:
-    # In Onika, we assume config/checksum.json
-    return "config/checksum.json"
-
-
-def _fetch_remote_manifest(remote_config: Dict[str, Any]) -> Tuple[Dict[str, str], str]:
-    checksum_rel = _resolve_remote_checksum_path(remote_config)
-    checksum_url = f"{_get_remote_base_url()}{checksum_rel}"
+def _fetch_remote_manifest() -> Tuple[Dict[str, str], str]:
+    checksum_url = f"{_get_remote_base_url()}{REMOTE_MANIFEST_PATH}"
     try:
         payload = _http_get_json(checksum_url)
     except UpdateError as exc:
@@ -124,9 +109,8 @@ def _fetch_remote_manifest(remote_config: Dict[str, Any]) -> Tuple[Dict[str, str
 
 def _build_plan(
     selected_paths: Optional[Iterable[str]] = None
-) -> Tuple[Dict[str, Any], Dict[str, str], Dict[str, str], List[Dict[str, Any]], List[str], List[str], str]:
-    remote_config = _fetch_remote_config()
-    remote_manifest, checksum_url = _fetch_remote_manifest(remote_config)
+) -> Tuple[Dict[str, str], Dict[str, str], List[Dict[str, Any]], List[str], List[str], str]:
+    remote_manifest, checksum_url = _fetch_remote_manifest()
     local_manifest = _load_local_checksums()
 
     skip_set = _get_skip_paths()
@@ -161,7 +145,6 @@ def _build_plan(
         missing_targets = sorted(path for path in normalized_selection if path not in remote_manifest)
 
     return (
-        remote_config,
         remote_manifest,
         local_manifest,
         plan_entries,
@@ -177,7 +160,6 @@ def check_for_updates(selected_paths: Optional[Iterable[str]] = None) -> Dict[st
 
     try:
         (
-            remote_config,
             remote_manifest,
             local_manifest,
             entries,
@@ -208,13 +190,11 @@ def check_for_updates(selected_paths: Optional[Iterable[str]] = None) -> Dict[st
         "skipped": sorted(_get_skip_paths()),
         "reference": {
             "base_url": _get_remote_base_url(),
-            "config_url": f"{_get_remote_base_url()}{REMOTE_CONFIG_PATH}",
             "checksum_url": checksum_url,
         },
         "checked_at": timestamp,
         "remote_manifest_size": len(remote_manifest),
         "local_manifest_size": len(local_manifest),
-        "remote_version_hint": remote_config.get("version"),
     }
 
 
@@ -234,7 +214,6 @@ def apply_updates(selected_paths: Optional[Iterable[str]] = None) -> Dict[str, A
 
     try:
         (
-            remote_config,
             remote_manifest,
             local_manifest,
             entries,
@@ -263,7 +242,6 @@ def apply_updates(selected_paths: Optional[Iterable[str]] = None) -> Dict[str, A
             "skipped": sorted(_get_skip_paths()),
             "reference": {
                 "base_url": _get_remote_base_url(),
-                "config_url": f"{_get_remote_base_url()}{REMOTE_CONFIG_PATH}",
                 "checksum_url": checksum_url,
             },
             "checked_at": timestamp,
@@ -310,7 +288,6 @@ def apply_updates(selected_paths: Optional[Iterable[str]] = None) -> Dict[str, A
         "skipped": sorted(_get_skip_paths()),
         "reference": {
             "base_url": _get_remote_base_url(),
-            "config_url": f"{_get_remote_base_url()}{REMOTE_CONFIG_PATH}",
             "checksum_url": checksum_url,
         },
         "checked_at": timestamp,

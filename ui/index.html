@@ -49,31 +49,31 @@
                 </div>
 
                 <div class="card">
-                    <div class="update-status-container">
-                        <div id="update-status-text">Check for updates to see available changes.</div>
-                        <div class="update-actions">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div id="update-status-text" style="font-weight: 500;">Check for updates to see available changes.</div>
+                        <div style="display: flex; gap: 10px;">
                             <button id="btn-check-updates" class="btn-primary" onclick="checkUpdates()">Check for Updates</button>
-                            <button id="btn-apply-updates" class="btn-success" onclick="applyUpdates()" style="display: none;">Apply Updates</button>
+                            <button id="btn-apply-updates" class="btn-success" onclick="applyUpdates()" style="display: none; background: var(--success); color: white; border: none; padding: 8px 16px; border-radius: var(--radius-sm); cursor: pointer; font-weight: 600;">Apply Updates</button>
                         </div>
                     </div>
                 </div>
 
                 <div id="update-info-card" class="card" style="display: none;">
-                    <div class="card-title">Update Details</div>
-                    <div id="update-summary" style="margin-bottom: 16px; font-size: 14px; color: var(--text-secondary);"></div>
+                    <div class="card-title" style="margin-bottom: 15px;">Update Details</div>
+                    <div id="update-summary" style="margin-bottom: 15px; font-size: 13px; color: var(--text-secondary);"></div>
                     
-                    <div class="update-list-header">
+                    <div style="display: grid; grid-template-columns: 1fr 120px; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px;">
                         <span>File Path</span>
-                        <span>Status</span>
+                        <span style="text-align: center;">Status</span>
                     </div>
-                    <div id="update-file-list" class="update-file-list">
+                    <div id="update-file-list" style="display: flex; flex-direction: column; gap: 5px; max-height: 300px; overflow-y: auto;">
                         <!-- Files will be listed here -->
                     </div>
                 </div>
 
                 <div id="update-log-card" class="card" style="display: none;">
-                    <div class="card-title">Update Log</div>
-                    <div id="update-log" class="console-area" style="height: 200px; font-size: 12px;"></div>
+                    <div class="card-title" style="margin-bottom: 10px;">Update Log</div>
+                    <div id="update-log" style="background: #000; color: #0f0; padding: 15px; border-radius: 8px; font-family: var(--font-mono); font-size: 12px; height: 200px; overflow-y: auto; white-space: pre-wrap;"></div>
                 </div>
             </div>
 

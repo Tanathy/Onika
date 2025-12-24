@@ -22,7 +22,7 @@ function openTab(tabName) {
         drawChart();
     }
     if (tabName === 'updates') {
-        // Optional: auto-check on open? Maybe not to avoid unnecessary requests.
+        // Updates tab opened
     }
 }
 
@@ -55,15 +55,26 @@ async function checkUpdates() {
                 applyBtn.style.display = 'block';
                 infoCard.style.display = 'block';
                 
-                summary.textContent = `Remote version hint: ${data.remote_version_hint || 'N/A'} | Checked at: ${new Date(data.checked_at).toLocaleString()}`;
+                summary.textContent = `Checked at: ${new Date(data.checked_at).toLocaleString()}`;
                 
                 fileList.innerHTML = '';
                 data.files.forEach(file => {
                     const item = document.createElement('div');
-                    item.className = 'update-file-item';
+                    item.style.display = 'grid';
+                    item.style.gridTemplateColumns = '1fr 120px';
+                    item.style.padding = '8px 10px';
+                    item.style.background = 'rgba(255,255,255,0.02)';
+                    item.style.borderRadius = '4px';
+                    item.style.fontSize = '13px';
+                    item.style.alignItems = 'center';
+                    
+                    let statusColor = '#888';
+                    if (file.status === 'missing') statusColor = '#ffc107';
+                    if (file.status === 'outdated') statusColor = '#2196f3';
+
                     item.innerHTML = `
-                        <div class="update-file-path" title="${file.path}">${file.path}</div>
-                        <div class="update-file-status status-${file.status}">${file.status}</div>
+                        <div style="font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${file.path}">${file.path}</div>
+                        <div style="text-align: center; font-size: 11px; font-weight: 700; text-transform: uppercase; color: ${statusColor}; background: ${statusColor}22; padding: 2px 8px; border-radius: 10px;">${file.status}</div>
                     `;
                     fileList.appendChild(item);
                 });
@@ -109,7 +120,7 @@ async function applyUpdates() {
         const response = await fetch(`${API_BASE}/updates/apply`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ selected_paths: null }) // null means apply all
+            body: JSON.stringify({ selected_paths: null })
         });
         const data = await response.json();
 
@@ -125,20 +136,6 @@ async function applyUpdates() {
             statusText.textContent = data.status === 'success' ? 'Updates applied successfully!' : 'Updates completed with some errors.';
             showNotification(data.status === 'success' ? 'Update complete!' : 'Update partial', data.status === 'success' ? 'success' : 'warning');
             
-            // Refresh file list status
-            const fileItems = document.querySelectorAll('.update-file-item');
-            fileItems.forEach(item => {
-                const path = item.querySelector('.update-file-path').textContent;
-                const statusEl = item.querySelector('.update-file-status');
-                if (data.updated.includes(path)) {
-                    statusEl.textContent = 'updated';
-                    statusEl.className = 'update-file-status status-updated';
-                } else if (data.failed.find(f => f.path === path)) {
-                    statusEl.textContent = 'failed';
-                    statusEl.className = 'update-file-status status-failed';
-                }
-            });
-
             if (data.status === 'success') {
                 btn.style.display = 'none';
             }
