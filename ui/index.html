@@ -24,6 +24,7 @@
             <button id="nav-training" class="nav-item active" onclick="openTab('training')">Training</button>
             <button class="nav-item" onclick="openTab('console')">Console</button>
             <button class="nav-item" onclick="openTab('metadata')">Metadata</button>
+            <button class="nav-item" onclick="openTab('updates')">Updates</button>
             <!-- <button class="nav-item" onclick="openTab('conversion')">Conversion</button> -->
             
             <div style="flex: 1;"></div>
@@ -40,6 +41,42 @@
         <!-- MAIN CONTENT -->
         <main class="main-content">
             
+            <!-- UPDATES TAB -->
+            <div id="tab-updates" class="tab-content">
+                <div class="page-header">
+                    <h1 class="page-title">System Updates</h1>
+                    <p class="page-subtitle">Keep your Onika installation up to date</p>
+                </div>
+
+                <div class="card">
+                    <div class="update-status-container">
+                        <div id="update-status-text">Check for updates to see available changes.</div>
+                        <div class="update-actions">
+                            <button id="btn-check-updates" class="btn-primary" onclick="checkUpdates()">Check for Updates</button>
+                            <button id="btn-apply-updates" class="btn-success" onclick="applyUpdates()" style="display: none;">Apply Updates</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="update-info-card" class="card" style="display: none;">
+                    <div class="card-title">Update Details</div>
+                    <div id="update-summary" style="margin-bottom: 16px; font-size: 14px; color: var(--text-secondary);"></div>
+                    
+                    <div class="update-list-header">
+                        <span>File Path</span>
+                        <span>Status</span>
+                    </div>
+                    <div id="update-file-list" class="update-file-list">
+                        <!-- Files will be listed here -->
+                    </div>
+                </div>
+
+                <div id="update-log-card" class="card" style="display: none;">
+                    <div class="card-title">Update Log</div>
+                    <div id="update-log" class="console-area" style="height: 200px; font-size: 12px;"></div>
+                </div>
+            </div>
+
             <!-- TRAINING TAB -->
             <div id="tab-training" class="tab-content active">
                 <div class="page-header">

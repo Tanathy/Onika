@@ -21,6 +21,142 @@ function openTab(tabName) {
     if (tabName === 'console') {
         drawChart();
     }
+    if (tabName === 'updates') {
+        // Optional: auto-check on open? Maybe not to avoid unnecessary requests.
+    }
+}
+
+// --- UPDATES ---
+let _pendingUpdates = [];
+
+async function checkUpdates() {
+    const btn = document.getElementById('btn-check-updates');
+    const statusText = document.getElementById('update-status-text');
+    const applyBtn = document.getElementById('btn-apply-updates');
+    const infoCard = document.getElementById('update-info-card');
+    const fileList = document.getElementById('update-file-list');
+    const summary = document.getElementById('update-summary');
+
+    btn.disabled = true;
+    btn.textContent = 'Checking...';
+    statusText.textContent = 'Checking for updates...';
+    applyBtn.style.display = 'none';
+    infoCard.style.display = 'none';
+
+    try {
+        const response = await fetch(`${API_BASE}/updates/check`);
+        const data = await response.json();
+
+        if (data.status === 'success') {
+            _pendingUpdates = data.files || [];
+            
+            if (data.has_updates) {
+                statusText.textContent = `Found ${data.files.length} update(s) available.`;
+                applyBtn.style.display = 'block';
+                infoCard.style.display = 'block';
+                
+                summary.textContent = `Remote version hint: ${data.remote_version_hint || 'N/A'} | Checked at: ${new Date(data.checked_at).toLocaleString()}`;
+                
+                fileList.innerHTML = '';
+                data.files.forEach(file => {
+                    const item = document.createElement('div');
+                    item.className = 'update-file-item';
+                    item.innerHTML = `
+                        <div class="update-file-path" title="${file.path}">${file.path}</div>
+                        <div class="update-file-status status-${file.status}">${file.status}</div>
+                    `;
+                    fileList.appendChild(item);
+                });
+                
+                showNotification('Updates available!', 'info');
+            } else {
+                statusText.textContent = 'Your system is up to date.';
+                showNotification('No updates found.', 'success');
+            }
+        } else {
+            statusText.textContent = 'Failed to check for updates.';
+            showNotification(data.messageParams?.error || 'Update check failed', 'error');
+        }
+    } catch (error) {
+        console.error('Update check error:', error);
+        statusText.textContent = 'Error connecting to update server.';
+        showNotification('Connection error', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Check for Updates';
+    }
+}
+
+async function applyUpdates() {
+    const btn = document.getElementById('btn-apply-updates');
+    const checkBtn = document.getElementById('btn-check-updates');
+    const statusText = document.getElementById('update-status-text');
+    const logCard = document.getElementById('update-log-card');
+    const logArea = document.getElementById('update-log');
+
+    if (!confirm(`Are you sure you want to apply ${_pendingUpdates.length} update(s)?`)) {
+        return;
+    }
+
+    btn.disabled = true;
+    checkBtn.disabled = true;
+    btn.textContent = 'Applying...';
+    statusText.textContent = 'Applying updates...';
+    logCard.style.display = 'block';
+    logArea.innerHTML = 'Starting update process...\n';
+
+    try {
+        const response = await fetch(`${API_BASE}/updates/apply`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ selected_paths: null }) // null means apply all
+        });
+        const data = await response.json();
+
+        if (data.status === 'success' || data.status === 'partial') {
+            logArea.innerHTML += `Updated ${data.updated.length} files.\n`;
+            if (data.failed.length > 0) {
+                logArea.innerHTML += `Failed to update ${data.failed.length} files.\n`;
+                data.failed.forEach(f => {
+                    logArea.innerHTML += `Error on ${f.path}: ${f.error}\n`;
+                });
+            }
+            
+            statusText.textContent = data.status === 'success' ? 'Updates applied successfully!' : 'Updates completed with some errors.';
+            showNotification(data.status === 'success' ? 'Update complete!' : 'Update partial', data.status === 'success' ? 'success' : 'warning');
+            
+            // Refresh file list status
+            const fileItems = document.querySelectorAll('.update-file-item');
+            fileItems.forEach(item => {
+                const path = item.querySelector('.update-file-path').textContent;
+                const statusEl = item.querySelector('.update-file-status');
+                if (data.updated.includes(path)) {
+                    statusEl.textContent = 'updated';
+                    statusEl.className = 'update-file-status status-updated';
+                } else if (data.failed.find(f => f.path === path)) {
+                    statusEl.textContent = 'failed';
+                    statusEl.className = 'update-file-status status-failed';
+                }
+            });
+
+            if (data.status === 'success') {
+                btn.style.display = 'none';
+            }
+        } else {
+            statusText.textContent = 'Failed to apply updates.';
+            logArea.innerHTML += `Error: ${data.messageParams?.error || 'Unknown error'}\n`;
+            showNotification('Update failed', 'error');
+        }
+    } catch (error) {
+        console.error('Update apply error:', error);
+        statusText.textContent = 'Error applying updates.';
+        logArea.innerHTML += `Connection error: ${error.message}\n`;
+        showNotification('Connection error', 'error');
+    } finally {
+        btn.disabled = false;
+        checkBtn.disabled = false;
+        btn.textContent = 'Apply Updates';
+    }
 }
 
 function openSubTab(tabName) {

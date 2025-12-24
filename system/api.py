@@ -10,6 +10,7 @@ from system import coordinator_settings as cs
 from system.context import MODEL_MANAGER, DATASET_MANAGER, TRAINING_MANAGER
 from system.training.schema import TrainingConfig
 from system.hardware import get_system_info
+from system import updater
 
 # Request Models
 class CaptionUpdate(BaseModel):
@@ -27,6 +28,9 @@ class ConversionRequest(BaseModel):
 
 class StartTrainingRequest(BaseModel):
     config: TrainingConfig
+
+class UpdateApplyRequest(BaseModel):
+    selected_paths: Optional[List[str]] = None
 
 def init_app(root_path: Path):
     app = FastAPI(title="Onika Trainer")
@@ -181,6 +185,15 @@ def init_app(root_path: Path):
     @app.post("/api/tools/convert")
     async def convert_model(req: ConversionRequest):
         return {"status": "success", "output_path": req.output_name or "converted.safetensors"}
+
+    # Update Endpoints
+    @app.get("/api/updates/check")
+    async def check_updates():
+        return updater.check_for_updates()
+
+    @app.post("/api/updates/apply")
+    async def apply_updates(data: UpdateApplyRequest):
+        return updater.apply_updates(data.selected_paths)
 
     # Serve UI
     ui_path = root_path / "ui"
