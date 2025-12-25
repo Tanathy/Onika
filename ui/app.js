@@ -1725,6 +1725,47 @@ async function autoOptimize() {
     }
 }
 
+async function autoAdjust() {
+    try {
+        const config = getTrainingFormData();
+        const res = await fetch(`${API_BASE}/training/auto_adjust`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ config })
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            showNotification(err.detail || 'Auto Adjust failed', 'error');
+            return;
+        }
+
+        const data = await res.json();
+        const patch = data && data.patch ? data.patch : {};
+
+        if (!patch || Object.keys(patch).length === 0) {
+            showNotification('Auto Adjust: no changes suggested (dataset missing?)', 'warning');
+            return;
+        }
+
+        // Apply like a preset
+        applyConfigToForm(patch);
+
+        updateNetworkFields();
+        buildDynamicLossFields();
+        buildDynamicOptimizationFields();
+        renderOptimizerArgHints();
+        syncCustomDropdownsWithin(document.getElementById('training-form'));
+
+        const n = data?.stats?.image_count;
+        const msg = typeof n === 'number' ? `Auto Adjust applied (dataset: ${n} images).` : 'Auto Adjust applied.';
+        showNotification(msg, 'success');
+    } catch (e) {
+        console.error('Auto Adjust error:', e);
+        showNotification('Auto Adjust failed', 'error');
+    }
+}
+
 async function saveSelectedPreset() {
     const select = document.getElementById("preset_selector");
     const presetName = select.value;

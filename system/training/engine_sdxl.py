@@ -148,7 +148,10 @@ def train_sdxl(config: TrainingConfig, status_callback: Callable):
     elif accelerator.mixed_precision == "bf16":
         weight_dtype = torch.bfloat16
         
-    vae.to(accelerator.device, dtype=torch.float32)
+    vae_dtype = torch.float32
+    if not bool(getattr(config, "no_half_vae", False)) and (bool(getattr(config, "full_fp16", False)) or bool(getattr(config, "full_bf16", False))):
+        vae_dtype = weight_dtype
+    vae.to(accelerator.device, dtype=vae_dtype)
     text_encoder_one.to(accelerator.device, dtype=weight_dtype)
     text_encoder_two.to(accelerator.device, dtype=weight_dtype)
     unet.to(accelerator.device, dtype=weight_dtype)
@@ -220,12 +223,14 @@ def train_sdxl(config: TrainingConfig, status_callback: Callable):
         vae.to("cpu")
         flush()
     
+    persistent_workers = bool(getattr(config, "persistent_data_loader_workers", False))
     dataloader = DataLoader(
         dataset,
         batch_size=config.batch_size,
         shuffle=config.dataloader_shuffle,
         collate_fn=collate_fn_sdxl,
-        num_workers=config.dataloader_num_workers
+        num_workers=config.dataloader_num_workers,
+        persistent_workers=persistent_workers if int(getattr(config, "dataloader_num_workers", 0) or 0) > 0 else False,
     )
     
     # 7. Prepare with Accelerator
@@ -247,14 +252,36 @@ def train_sdxl(config: TrainingConfig, status_callback: Callable):
             sigma = sigma.unsqueeze(-1)
         return sigma
 
+    def per_element_loss(pred, tgt):
+        lt = (getattr(config, "loss_type", None) or "l2").strip().lower()
+        if lt in {"l1", "mae"}:
+            return F.l1_loss(pred.float(), tgt.float(), reduction="none")
+        if lt == "huber":
+            return F.huber_loss(pred.float(), tgt.float(), reduction="none", delta=float(getattr(config, "huber_c", 0.1) or 0.1))
+        if lt in {"smooth_l1", "smoothl1"}:
+            return F.smooth_l1_loss(pred.float(), tgt.float(), reduction="none")
+        return F.mse_loss(pred.float(), tgt.float(), reduction="none")
+
     num_update_steps_per_epoch = len(dataloader) // config.gradient_accumulation_steps
-    max_train_steps = config.max_train_epochs * num_update_steps_per_epoch
+    num_update_steps_per_epoch = max(1, int(num_update_steps_per_epoch))
+
+    max_train_steps = int(config.max_train_steps) if config.max_train_steps else (config.max_train_epochs * num_update_steps_per_epoch)
+    max_train_steps = max(1, int(max_train_steps))
+    planned_epochs = int((max_train_steps + num_update_steps_per_epoch - 1) // num_update_steps_per_epoch)
+    planned_epochs = max(1, planned_epochs)
     
+    warmup_steps = int(config.lr_warmup_steps or 0)
+    if warmup_steps <= 0 and (config.lr_warmup_ratio or 0.0) > 0:
+        warmup_steps = int(max_train_steps * float(config.lr_warmup_ratio))
+    warmup_steps = max(0, int(warmup_steps))
+
     lr_scheduler = get_scheduler(
         config.lr_scheduler,
         optimizer=optimizer,
-        num_warmup_steps=config.lr_warmup_steps,
+        num_warmup_steps=warmup_steps,
         num_training_steps=max_train_steps,
+        num_cycles=int(config.lr_scheduler_num_cycles or 1),
+        power=float(config.lr_scheduler_power or 1.0),
     )
     
     # Custom saving & loading hooks
@@ -313,7 +340,9 @@ def train_sdxl(config: TrainingConfig, status_callback: Callable):
 
     status_callback(global_step, max_train_steps, 0, first_epoch, "Starting training loop...")
     
-    for epoch in range(first_epoch, config.max_train_epochs):
+    stop_training = False
+    best_loss = float("inf")
+    for epoch in range(first_epoch, planned_epochs):
         unet.train()
         if config.train_text_encoder:
             text_encoder_one.train()
@@ -341,6 +370,7 @@ def train_sdxl(config: TrainingConfig, status_callback: Callable):
                 if config.noise_offset_strength > 0 or config.noise_offset_random_strength > 0:
                     noise = apply_noise_offset(
                         noise,
+                        noise_offset_type=getattr(config, "noise_offset_type", "original"),
                         noise_offset=config.noise_offset_strength,
                         noise_offset_random_strength=config.noise_offset_random_strength,
                         adaptive_noise_scale=config.adaptive_noise_scale if config.adaptive_noise_scale > 0 else None,
@@ -453,7 +483,7 @@ def train_sdxl(config: TrainingConfig, status_callback: Callable):
                     if noise_scheduler.config.prediction_type == "v_prediction":
                         mse_loss_weights = mse_loss_weights + 1
                     
-                    loss = F.mse_loss(model_pred.float(), target.float(), reduction="none")
+                    loss = per_element_loss(model_pred, target)
                     loss = loss.mean(dim=list(range(1, len(loss.shape))))
                     loss = loss * mse_loss_weights
 
@@ -464,7 +494,7 @@ def train_sdxl(config: TrainingConfig, status_callback: Callable):
 
                     loss = loss.mean()
                 else:
-                    loss = F.mse_loss(model_pred.float(), target.float(), reduction="none")
+                    loss = per_element_loss(model_pred, target)
                     loss = loss.mean(dim=list(range(1, len(loss.shape))))
 
                     if config.v_pred_like_loss and config.v_pred_like_loss > 0 and noise_scheduler.config.prediction_type == "epsilon":
@@ -487,15 +517,22 @@ def train_sdxl(config: TrainingConfig, status_callback: Callable):
             if accelerator.sync_gradients:
                 global_step += 1
                 status_callback(global_step, max_train_steps, loss.item(), epoch, None)
+
+                if global_step >= max_train_steps:
+                    stop_training = True
+                    break
                 
                 # Save every n steps
                 if config.save_every_n_steps and global_step % config.save_every_n_steps == 0:
-                    # save_path = os.path.join(config.output_dir, f"checkpoint-{global_step}")
-                    # accelerator.save_state(save_path)
-                    # manage_checkpoints(config.output_dir, config.checkpoints_total_limit)
-                    save_lora_weights(accelerator, unet, config, global_step, 
-                                      text_encoder_one if config.train_text_encoder else None,
-                                      text_encoder_two if config.train_text_encoder else None)
+                    cur_loss = float(loss.item())
+                    if (not getattr(config, "save_best_only", False)) or (cur_loss < best_loss):
+                        best_loss = min(best_loss, cur_loss)
+                        save_lora_weights(
+                            accelerator, unet, config, global_step,
+                            text_encoder_one if config.train_text_encoder else None,
+                            text_encoder_two if config.train_text_encoder else None,
+                        )
+                        manage_checkpoints(config.output_dir, config.checkpoints_total_limit, output_name=config.output_name)
 
                 # Sample generation
                 if config.sample_every_n_steps and global_step % config.sample_every_n_steps == 0:
@@ -521,6 +558,9 @@ def train_sdxl(config: TrainingConfig, status_callback: Callable):
                         text_encoder_two.to("cpu")
                     flush()
 
+            if stop_training:
+                break
+
         # Epoch end
         if config.sample_every_n_epochs and (epoch + 1) % config.sample_every_n_epochs == 0:
             if not config.train_text_encoder and config.cache_text_embeddings:
@@ -545,12 +585,15 @@ def train_sdxl(config: TrainingConfig, status_callback: Callable):
             flush()
 
         if (epoch + 1) % config.save_every_n_epochs == 0:
-            # save_path = os.path.join(config.output_dir, f"checkpoint-{global_step}")
-            # accelerator.save_state(save_path)
-            # manage_checkpoints(config.output_dir, config.checkpoints_total_limit)
-            save_lora_weights(accelerator, unet, config, global_step, 
-                              text_encoder_one if config.train_text_encoder else None,
-                              text_encoder_two if config.train_text_encoder else None)
+            cur_loss = float(loss.item())
+            if (not getattr(config, "save_best_only", False)) or (cur_loss < best_loss):
+                best_loss = min(best_loss, cur_loss)
+                save_lora_weights(
+                    accelerator, unet, config, global_step,
+                    text_encoder_one if config.train_text_encoder else None,
+                    text_encoder_two if config.train_text_encoder else None,
+                )
+                manage_checkpoints(config.output_dir, config.checkpoints_total_limit, output_name=config.output_name)
 
     # 9. Save Final
     status_callback(global_step, max_train_steps, 0, 0, "Saving Final LoRA...")

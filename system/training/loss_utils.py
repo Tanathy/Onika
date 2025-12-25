@@ -261,6 +261,7 @@ def prepare_scheduler_for_custom_training(
 
 def apply_noise_offset(
     noise: torch.Tensor,
+    noise_offset_type: str,
     noise_offset: float,
     noise_offset_random_strength: float = 0.0,
     adaptive_noise_scale: Optional[float] = None,
@@ -281,6 +282,8 @@ def apply_noise_offset(
     """
     if noise_offset <= 0.0 and noise_offset_random_strength <= 0.0:
         return noise
+
+    mode = (noise_offset_type or "original").strip().lower()
     
     # Calculate actual offset
     if noise_offset_random_strength > 0.0:
@@ -293,10 +296,15 @@ def apply_noise_offset(
         offset = offset * latents.std(dim=[1, 2, 3], keepdim=True)
     
     # Add offset noise
-    noise = noise + offset * torch.randn(
-        noise.shape[0], noise.shape[1], 1, 1, 
-        device=noise.device, dtype=noise.dtype
-    )
+    if mode == "alternative":
+        # Channel-wise full noise (stronger); kept optional via type switch.
+        noise = noise + offset * torch.randn_like(noise)
+    else:
+        # Original (kohya-style): per-channel scalar offset.
+        noise = noise + offset * torch.randn(
+            noise.shape[0], noise.shape[1], 1, 1,
+            device=noise.device, dtype=noise.dtype
+        )
     
     return noise
 

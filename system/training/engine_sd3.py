@@ -102,7 +102,10 @@ def train_sd3(config: TrainingConfig, status_callback: Optional[Callable] = None
     elif accelerator.mixed_precision == "bf16":
         weight_dtype = torch.bfloat16
 
-    vae.to(accelerator.device, dtype=torch.float32) # Keep VAE in float32
+    vae_dtype = torch.float32
+    if not bool(getattr(config, "no_half_vae", False)) and (bool(getattr(config, "full_fp16", False)) or bool(getattr(config, "full_bf16", False))):
+        vae_dtype = weight_dtype
+    vae.to(accelerator.device, dtype=vae_dtype)
     text_encoder_one.to(accelerator.device, dtype=weight_dtype)
     text_encoder_two.to(accelerator.device, dtype=weight_dtype)
     text_encoder_three.to(accelerator.device, dtype=weight_dtype)
@@ -164,23 +167,32 @@ def train_sd3(config: TrainingConfig, status_callback: Optional[Callable] = None
         # Move VAE to CPU to save VRAM since we have cached latents
         vae.to("cpu")
         flush()
+    persistent_workers = bool(getattr(config, "persistent_data_loader_workers", False))
     train_dataloader = torch.utils.data.DataLoader(
         dataset,
         batch_size=config.batch_size,
         shuffle=config.dataloader_shuffle,
         collate_fn=collate_fn_general,
         num_workers=config.dataloader_num_workers,
+        persistent_workers=persistent_workers if int(getattr(config, "dataloader_num_workers", 0) or 0) > 0 else False,
     )
 
     # Scheduler
     num_update_steps_per_epoch = len(train_dataloader) // config.gradient_accumulation_steps
     max_train_steps = config.max_train_steps or (config.max_train_epochs * num_update_steps_per_epoch)
 
+    warmup_steps = int(config.lr_warmup_steps or 0)
+    if warmup_steps <= 0 and (config.lr_warmup_ratio or 0.0) > 0:
+        warmup_steps = int(max_train_steps * float(config.lr_warmup_ratio))
+    warmup_steps = max(0, int(warmup_steps))
+
     lr_scheduler = get_scheduler(
         config.lr_scheduler,
         optimizer=optimizer,
-        num_warmup_steps=config.lr_warmup_steps,
+        num_warmup_steps=warmup_steps,
         num_training_steps=max_train_steps,
+        num_cycles=int(config.lr_scheduler_num_cycles or 1),
+        power=float(config.lr_scheduler_power or 1.0),
     )
     
     # Custom saving & loading hooks
@@ -279,6 +291,8 @@ def train_sd3(config: TrainingConfig, status_callback: Optional[Callable] = None
     # Training loop
     num_epochs = config.max_train_epochs
     epoch = first_epoch
+
+    best_loss = float("inf")
 
     for epoch in range(first_epoch, num_epochs):
         transformer.train()
@@ -410,13 +424,16 @@ def train_sd3(config: TrainingConfig, status_callback: Optional[Callable] = None
                     status_callback(global_step, max_train_steps, loss.item(), epoch)
 
                 if config.save_every_n_steps and global_step % config.save_every_n_steps == 0:
-                    # save_path = os.path.join(config.output_dir, f"checkpoint-{global_step}")
-                    # accelerator.save_state(save_path)
-                    # manage_checkpoints(config.output_dir, config.checkpoints_total_limit)
-                    save_lora_weights(accelerator, transformer, config, global_step, 
-                                      text_encoder_one if config.train_text_encoder else None,
-                                      text_encoder_two if config.train_text_encoder else None,
-                                      text_encoder_three if config.train_text_encoder else None)
+                    cur_loss = float(loss.item())
+                    if (not getattr(config, "save_best_only", False)) or (cur_loss < best_loss):
+                        best_loss = min(best_loss, cur_loss)
+                        save_lora_weights(
+                            accelerator, transformer, config, global_step,
+                            text_encoder_one if config.train_text_encoder else None,
+                            text_encoder_two if config.train_text_encoder else None,
+                            text_encoder_three if config.train_text_encoder else None,
+                        )
+                        manage_checkpoints(config.output_dir, config.checkpoints_total_limit, output_name=config.output_name)
 
                 if config.sample_every_n_steps and global_step % config.sample_every_n_steps == 0:
                     if not config.train_text_encoder and config.cache_text_embeddings:
@@ -472,13 +489,16 @@ def train_sd3(config: TrainingConfig, status_callback: Optional[Callable] = None
             flush()
 
         if (epoch + 1) % config.save_every_n_epochs == 0:
-            # save_path = os.path.join(config.output_dir, f"checkpoint-{global_step}")
-            # accelerator.save_state(save_path)
-            # manage_checkpoints(config.output_dir, config.checkpoints_total_limit)
-            save_lora_weights(accelerator, transformer, config, global_step, 
-                              text_encoder_one if config.train_text_encoder else None,
-                              text_encoder_two if config.train_text_encoder else None,
-                              text_encoder_three if config.train_text_encoder else None)
+            cur_loss = float(loss.item())
+            if (not getattr(config, "save_best_only", False)) or (cur_loss < best_loss):
+                best_loss = min(best_loss, cur_loss)
+                save_lora_weights(
+                    accelerator, transformer, config, global_step,
+                    text_encoder_one if config.train_text_encoder else None,
+                    text_encoder_two if config.train_text_encoder else None,
+                    text_encoder_three if config.train_text_encoder else None,
+                )
+                manage_checkpoints(config.output_dir, config.checkpoints_total_limit, output_name=config.output_name)
 
             if global_step >= max_train_steps:
                 break

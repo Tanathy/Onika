@@ -22,6 +22,8 @@ from tqdm.auto import tqdm
 from safetensors.torch import save_file
 from peft import LoraConfig, get_peft_model, get_peft_model_state_dict
 
+from .loss_utils import apply_noise_offset, fix_noise_scheduler_betas_for_zero_terminal_snr
+
 from .schema import TrainingConfig
 from .engine_utils import (
     OnikaDataset, 
@@ -148,7 +150,10 @@ def train_sd15(config: TrainingConfig, status_callback: Callable):
     elif accelerator.mixed_precision == "bf16":
         weight_dtype = torch.bfloat16
         
-    vae.to(accelerator.device, dtype=torch.float32)
+    vae_dtype = torch.float32
+    if not bool(getattr(config, "no_half_vae", False)) and (bool(getattr(config, "full_fp16", False)) or bool(getattr(config, "full_bf16", False))):
+        vae_dtype = weight_dtype
+    vae.to(accelerator.device, dtype=vae_dtype)
     text_encoder.to(accelerator.device, dtype=weight_dtype)
     unet.to(accelerator.device, dtype=weight_dtype)
     
@@ -250,12 +255,14 @@ def train_sd15(config: TrainingConfig, status_callback: Callable):
         vae.to("cpu")
         flush()
     
+    persistent_workers = bool(getattr(config, "persistent_data_loader_workers", False))
     dataloader = DataLoader(
         dataset,
         batch_size=config.batch_size,
         shuffle=config.dataloader_shuffle,
         collate_fn=collate_fn_general,
-        num_workers=config.dataloader_num_workers
+        num_workers=config.dataloader_num_workers,
+        persistent_workers=persistent_workers if int(getattr(config, "dataloader_num_workers", 0) or 0) > 0 else False,
     )
     
     # 7. Prepare with Accelerator
@@ -266,13 +273,28 @@ def train_sd15(config: TrainingConfig, status_callback: Callable):
 
     # 8. Training Loop
     num_update_steps_per_epoch = len(dataloader) // config.gradient_accumulation_steps
-    max_train_steps = config.max_train_epochs * num_update_steps_per_epoch
+    num_update_steps_per_epoch = max(1, int(num_update_steps_per_epoch))
+
+    max_train_steps = int(config.max_train_steps) if config.max_train_steps else (config.max_train_epochs * num_update_steps_per_epoch)
+    max_train_steps = max(1, int(max_train_steps))
+    planned_epochs = int((max_train_steps + num_update_steps_per_epoch - 1) // num_update_steps_per_epoch)
+    planned_epochs = max(1, planned_epochs)
+
+    if config.zero_terminal_snr:
+        fix_noise_scheduler_betas_for_zero_terminal_snr(noise_scheduler)
     
+    warmup_steps = int(config.lr_warmup_steps or 0)
+    if warmup_steps <= 0 and (config.lr_warmup_ratio or 0.0) > 0:
+        warmup_steps = int(max_train_steps * float(config.lr_warmup_ratio))
+    warmup_steps = max(0, int(warmup_steps))
+
     lr_scheduler = get_scheduler(
         config.lr_scheduler,
         optimizer=optimizer,
-        num_warmup_steps=config.lr_warmup_steps,
+        num_warmup_steps=warmup_steps,
         num_training_steps=max_train_steps,
+        num_cycles=int(config.lr_scheduler_num_cycles or 1),
+        power=float(config.lr_scheduler_power or 1.0),
     )
     
     # Custom saving & loading hooks
@@ -322,12 +344,24 @@ def train_sd15(config: TrainingConfig, status_callback: Callable):
             flush()
 
     status_callback(global_step, max_train_steps, 0, first_epoch, "Starting training loop...")
-    
-    num_train_epochs_text_encoder = int(config.train_text_encoder_frac * config.max_train_epochs)
-    if config.train_text_encoder_ti:
-        num_train_epochs_text_encoder = int(config.train_text_encoder_ti_frac * config.max_train_epochs)
 
-    for epoch in range(first_epoch, config.max_train_epochs):
+    def per_element_loss(pred, tgt):
+        lt = (getattr(config, "loss_type", None) or "l2").strip().lower()
+        if lt in {"l1", "mae"}:
+            return F.l1_loss(pred.float(), tgt.float(), reduction="none")
+        if lt == "huber":
+            return F.huber_loss(pred.float(), tgt.float(), reduction="none", delta=float(getattr(config, "huber_c", 0.1) or 0.1))
+        if lt in {"smooth_l1", "smoothl1"}:
+            return F.smooth_l1_loss(pred.float(), tgt.float(), reduction="none")
+        return F.mse_loss(pred.float(), tgt.float(), reduction="none")
+    
+    num_train_epochs_text_encoder = int(config.train_text_encoder_frac * planned_epochs)
+    if config.train_text_encoder_ti:
+        num_train_epochs_text_encoder = int(config.train_text_encoder_ti_frac * planned_epochs)
+
+    stop_training = False
+    best_loss = float("inf")
+    for epoch in range(first_epoch, planned_epochs):
         # Handle TE/TI freezing
         if config.train_text_encoder or config.train_text_encoder_ti:
             if epoch >= num_train_epochs_text_encoder:
@@ -355,9 +389,14 @@ def train_sd15(config: TrainingConfig, status_callback: Callable):
                 
                 # Noise
                 noise = torch.randn_like(latents)
-                if config.noise_offset_strength > 0:
-                    noise += config.noise_offset_strength * torch.randn(
-                        (latents.shape[0], latents.shape[1], 1, 1), device=latents.device
+                if config.noise_offset_strength > 0 or config.noise_offset_random_strength > 0:
+                    noise = apply_noise_offset(
+                        noise,
+                        noise_offset_type=getattr(config, "noise_offset_type", "original"),
+                        noise_offset=float(config.noise_offset_strength or 0.0),
+                        noise_offset_random_strength=float(config.noise_offset_random_strength or 0.0),
+                        adaptive_noise_scale=float(config.adaptive_noise_scale or 0.0) if (config.adaptive_noise_scale or 0.0) > 0 else None,
+                        latents=latents,
                     )
                 
                 bsz = latents.shape[0]
@@ -400,7 +439,7 @@ def train_sd15(config: TrainingConfig, status_callback: Callable):
                     if noise_scheduler.config.prediction_type == "v_prediction":
                         mse_loss_weights = mse_loss_weights + 1
 
-                    loss = F.mse_loss(model_pred.float(), target.float(), reduction="none")
+                    loss = per_element_loss(model_pred, target)
                     loss = loss.mean(dim=list(range(1, len(loss.shape))))
                     loss = loss * mse_loss_weights
 
@@ -411,7 +450,7 @@ def train_sd15(config: TrainingConfig, status_callback: Callable):
 
                     loss = loss.mean()
                 else:
-                    loss = F.mse_loss(model_pred.float(), target.float(), reduction="none")
+                    loss = per_element_loss(model_pred, target)
                     loss = loss.mean(dim=list(range(1, len(loss.shape))))
 
                     if config.v_pred_like_loss and config.v_pred_like_loss > 0 and noise_scheduler.config.prediction_type == "epsilon":
@@ -437,14 +476,17 @@ def train_sd15(config: TrainingConfig, status_callback: Callable):
             if accelerator.sync_gradients:
                 global_step += 1
                 status_callback(global_step, max_train_steps, loss.item(), epoch, None)
-                
+
                 # Save every n steps
                 if config.save_every_n_steps and global_step % config.save_every_n_steps == 0:
-                    # save_path = os.path.join(config.output_dir, f"checkpoint-{global_step}")
-                    # accelerator.save_state(save_path)
-                    # manage_checkpoints(config.output_dir, config.checkpoints_total_limit)
-                    save_lora_weights(accelerator, unet, config, global_step, 
-                                      text_encoder if config.train_text_encoder else None)
+                    cur_loss = float(loss.item())
+                    if (not getattr(config, "save_best_only", False)) or (cur_loss < best_loss):
+                        best_loss = min(best_loss, cur_loss)
+                        save_lora_weights(
+                            accelerator, unet, config, global_step,
+                            text_encoder if config.train_text_encoder else None,
+                        )
+                        manage_checkpoints(config.output_dir, config.checkpoints_total_limit, output_name=config.output_name)
 
                 # Sample generation
                 if config.sample_every_n_steps and global_step % config.sample_every_n_steps == 0:
@@ -466,6 +508,13 @@ def train_sd15(config: TrainingConfig, status_callback: Callable):
                     if not config.train_text_encoder and not config.train_text_encoder_ti and config.cache_text_embeddings:
                         text_encoder.to("cpu")
                     flush()
+
+                if global_step >= max_train_steps:
+                    stop_training = True
+                    break
+
+        if stop_training:
+            break
 
         # Epoch end
         if config.sample_every_n_epochs and (epoch + 1) % config.sample_every_n_epochs == 0:
@@ -489,11 +538,14 @@ def train_sd15(config: TrainingConfig, status_callback: Callable):
             flush()
 
         if (epoch + 1) % config.save_every_n_epochs == 0:
-            # save_path = os.path.join(config.output_dir, f"checkpoint-{global_step}")
-            # accelerator.save_state(save_path)
-            # manage_checkpoints(config.output_dir, config.checkpoints_total_limit)
-            save_lora_weights(accelerator, unet, config, global_step, 
-                              text_encoder if config.train_text_encoder else None)
+            cur_loss = float(loss.item())
+            if (not getattr(config, "save_best_only", False)) or (cur_loss < best_loss):
+                best_loss = min(best_loss, cur_loss)
+                save_lora_weights(
+                    accelerator, unet, config, global_step,
+                    text_encoder if config.train_text_encoder else None,
+                )
+                manage_checkpoints(config.output_dir, config.checkpoints_total_limit, output_name=config.output_name)
 
     # 9. Save Final
     status_callback(global_step, max_train_steps, 0, 0, "Saving Final LoRA...")

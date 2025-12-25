@@ -29,6 +29,10 @@ class ConversionRequest(BaseModel):
 class StartTrainingRequest(BaseModel):
     config: TrainingConfig
 
+
+class AutoAdjustRequest(BaseModel):
+    config: TrainingConfig
+
 class UpdateApplyRequest(BaseModel):
     selected_paths: Optional[List[str]] = None
 
@@ -120,6 +124,19 @@ def init_app(root_path: Path):
         try:
             TRAINING_MANAGER.start_training(config)
             return {"status": "started"}
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+    @app.post("/api/training/auto_adjust")
+    async def auto_adjust(req: AutoAdjustRequest):
+        """Return a preset-like patch tuned for the current dataset + chosen architecture.
+
+        IMPORTANT: This does not select the model or architecture. It only recommends config values.
+        """
+        from system.training.adjust import recommend_training_patch
+
+        try:
+            return recommend_training_patch(req.config, root_path)
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e))
 

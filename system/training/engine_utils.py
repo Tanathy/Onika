@@ -124,7 +124,7 @@ def collate_fn_sdxl(examples):
     original_sizes = [example["original_size"] for example in examples]
     crop_top_lefts = [example["crop_top_left"] for example in examples]
     
-    batch = {
+    batch: Dict[str, Any] = {
         "prompts": prompts,
         "original_sizes": original_sizes,
         "crop_top_lefts": crop_top_lefts
@@ -193,9 +193,9 @@ class OnikaDataset(Dataset):
         self.use_cached_latents = False
 
         # Augmentation transforms (applied AFTER crop, before tensor conversion)
-        # NOTE: Latent caching is incompatible with realtime image augmentation.
+        # NOTE: Disk latent caching is incompatible with realtime image augmentation.
         self.aug_transforms: List[Any] = []
-        if getattr(config, "cache_latents", False) or getattr(config, "cache_latents_to_disk", False):
+        if getattr(config, "cache_latents_to_disk", False):
             # Leave aug_transforms empty on purpose.
             pass
         else:
@@ -492,6 +492,14 @@ def get_optimizer(config, params):
         raise
 
 def apply_optimizations(model, config):
+    # TF32 can significantly speed up Ampere+ GPUs with minimal quality loss.
+    try:
+        if hasattr(config, "allow_tf32") and torch.cuda.is_available():
+            torch.backends.cuda.matmul.allow_tf32 = bool(config.allow_tf32)
+            torch.backends.cudnn.allow_tf32 = bool(config.allow_tf32)
+    except Exception:
+        pass
+
     if config.attention_backend == "xformers" or config.xformers:
         try:
             model.enable_xformers_memory_efficient_attention()
@@ -619,16 +627,46 @@ def save_lora_weights(accelerator, model, config, step, text_encoder=None, text_
     from peft.utils import get_peft_model_state_dict
     from safetensors.torch import save_file
     import json
+
+    if not accelerator.is_main_process:
+        return
     
     output_dir = Path(config.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     
+    save_format = (getattr(config, "save_model_as", None) or "safetensors").strip().lower()
+    if save_format in {"diffusers", "peft", "adapter"}:
+        # Save adapter(s) in PEFT/Diffusers directory format.
+        if step == -1:
+            root_dir = output_dir / f"{config.output_name}_diffusers"
+        else:
+            root_dir = output_dir / f"{config.output_name}_diffusers_s{step}"
+        root_dir.mkdir(parents=True, exist_ok=True)
+
+        unwrapped_model = accelerator.unwrap_model(model)
+        unwrapped_model.save_pretrained(root_dir / "unet", safe_serialization=True)
+
+        if text_encoder is not None:
+            accelerator.unwrap_model(text_encoder).save_pretrained(root_dir / "text_encoder", safe_serialization=True)
+        if text_encoder_2 is not None:
+            accelerator.unwrap_model(text_encoder_2).save_pretrained(root_dir / "text_encoder_2", safe_serialization=True)
+        if text_encoder_3 is not None:
+            accelerator.unwrap_model(text_encoder_3).save_pretrained(root_dir / "text_encoder_3", safe_serialization=True)
+
+        print(f"Saved Diffusers/PEFT adapters to {root_dir}")
+        return
+
+    if save_format not in {"safetensors", "safe", "st", "ckpt"}:
+        print(f"Unknown save_model_as={save_format!r}; falling back to safetensors")
+        save_format = "safetensors"
+
     # Determine filename
+    ext = "safetensors"
     if step == -1:
-        filename = f"{config.output_name}.safetensors"
+        filename = f"{config.output_name}.{ext}"
     else:
-        filename = f"{config.output_name}_s{step}.safetensors"
-    
+        filename = f"{config.output_name}_s{step}.{ext}"
+
     save_path = output_dir / filename
     
     # Get model state dict
@@ -815,18 +853,52 @@ Weights for this model are available in Safetensors format.
     model_card = populate_model_card(model_card, tags=tags)
     model_card.save(os.path.join(repo_folder, "README.md"))
 
-def manage_checkpoints(output_dir: str, checkpoints_total_limit: Optional[int]):
+def manage_checkpoints(output_dir: str, checkpoints_total_limit: Optional[int], output_name: Optional[str] = None):
     if checkpoints_total_limit is None or checkpoints_total_limit <= 0:
         return
 
-    checkpoints = [d for d in os.listdir(output_dir) if d.startswith("checkpoint")]
-    checkpoints = sorted(checkpoints, key=lambda x: int(x.split("-")[1]))
+    # 1) Accelerator state checkpoints (directories: checkpoint-<step>)
+    checkpoints = [d for d in os.listdir(output_dir) if d.startswith("checkpoint-") and os.path.isdir(os.path.join(output_dir, d))]
+    def _ckpt_step(name: str) -> int:
+        try:
+            return int(name.split("-")[1])
+        except Exception:
+            return -1
+    checkpoints = sorted(checkpoints, key=_ckpt_step)
 
     # we delete the oldest checkpoints
     if len(checkpoints) >= checkpoints_total_limit:
         num_to_delete = len(checkpoints) - checkpoints_total_limit + 1
         for i in range(num_to_delete):
             shutil.rmtree(os.path.join(output_dir, checkpoints[i]))
+
+    # 2) LoRA step-save files (<output_name>_s<step>.safetensors)
+    if output_name:
+        files = []
+        for fn in os.listdir(output_dir):
+            if not fn.startswith(f"{output_name}_s"):
+                continue
+            if not (fn.endswith(".safetensors") or fn.endswith(".pt")):
+                continue
+            files.append(fn)
+
+        def _file_step(name: str) -> int:
+            # <output_name>_s123.safetensors
+            try:
+                s = name[len(output_name) + 2 :]
+                s = s.split(".", 1)[0]
+                return int(s)
+            except Exception:
+                return -1
+
+        files = sorted(files, key=_file_step)
+        if len(files) > checkpoints_total_limit:
+            to_delete = len(files) - checkpoints_total_limit
+            for i in range(to_delete):
+                try:
+                    os.remove(os.path.join(output_dir, files[i]))
+                except Exception:
+                    pass
 
 def convert_to_kohya_format(state_dict, model_type, network_alpha=None):
     import torch
@@ -1056,6 +1128,14 @@ def generate_class_images(config: Any, accelerator: Accelerator, status_callback
 
     reg_data_dir = Path(config.reg_data_dir or "project/reg")
     reg_data_dir.mkdir(parents=True, exist_ok=True)
+
+    # Ensure downstream dataset construction can see the generated reg images.
+    # The engines call `generate_class_images()` before building the dataset.
+    if not getattr(config, "reg_data_dir", None):
+        try:
+            config.reg_data_dir = str(reg_data_dir)
+        except Exception:
+            pass
     
     cur_class_images = len(list(reg_data_dir.glob("*.jpg"))) + len(list(reg_data_dir.glob("*.png")))
     if cur_class_images >= config.num_class_images:
@@ -1072,14 +1152,14 @@ def generate_class_images(config: Any, accelerator: Accelerator, status_callback
     
     torch_dtype = torch.float16 if accelerator.device.type == "cuda" else torch.float32
     
-    # Determine the correct pipeline class based on the model type
-    # We default to DiffusionPipeline but try to be specific for SDXL/SD1.5
+    # Determine the correct pipeline class based on the model type.
+    # We default to DiffusionPipeline but try to be specific where possible.
     pipeline_class = DiffusionPipeline
     model_type = getattr(config, "model_type", "sdxl").lower()
     
     if "sdxl" in model_type:
         pipeline_class = StableDiffusionXLPipeline
-    elif "sd15" in model_type or "sd1.5" in model_type:
+    elif model_type in {"sd_legacy", "sd15", "sd1.5", "sd2", "sd2.0"} or "sd15" in model_type or "sd1.5" in model_type:
         pipeline_class = StableDiffusionPipeline
 
     try:
@@ -1161,7 +1241,7 @@ def generate_class_images(config: Any, accelerator: Accelerator, status_callback
                 output_type="pil"
             ).images[0]
             
-        save_path = reg_dir / f"reg_{i:05d}.png"
+        save_path = reg_data_dir / f"reg_{i:05d}.png"
         image.save(save_path)
         
     del pipeline
@@ -1180,6 +1260,7 @@ def cache_latents_to_disk(vae, dataset, config, accelerator, status_callback: Op
     (cache_dir / "class").mkdir(parents=True, exist_ok=True)
 
     index_path = cache_dir / "index.jsonl"
+    fingerprints_path = cache_dir / "fingerprints.json"
     
     info(f"Caching latents to {cache_dir}...")
 
@@ -1204,12 +1285,51 @@ def cache_latents_to_disk(vae, dataset, config, accelerator, status_callback: Op
     if getattr(dataset, "class_images_paths", None):
         class_paths = list(dataset.class_images_paths)  # type: ignore[arg-type]
     
+    # Fingerprints: STRICT content validation.
+    # No backwards-compat: we only accept sha256 fingerprints and will recache otherwise.
+    import json
+    import hashlib
+
+    def _sha256_file(p: Path, chunk_size: int = 1024 * 1024) -> Optional[str]:
+        try:
+            h = hashlib.sha256()
+            with open(p, "rb") as f:
+                while True:
+                    b = f.read(chunk_size)
+                    if not b:
+                        break
+                    h.update(b)
+            return h.hexdigest()
+        except Exception:
+            return None
+
+    fingerprints: Dict[str, Dict[str, str]] = {}
+    try:
+        if fingerprints_path.exists():
+            with open(fingerprints_path, "r", encoding="utf-8") as f:
+                loaded = json.load(f)
+            if isinstance(loaded, dict):
+                # key: "kind:keyhash" -> {sha256: "..."}
+                fingerprints = {str(k): v for k, v in loaded.items() if isinstance(v, dict) and isinstance(v.get("sha256"), str)}
+    except Exception:
+        fingerprints = {}
+
     # Process in chunks
     def _gather_missing(to_check: List[Path], kind: str, root: Path) -> List[Path]:
         missing: List[Path] = []
         for p in to_check:
             candidates = _latent_cache_paths(cache_dir, kind, root, p)
+            key = _latent_cache_key(root, p)
+            fp_key = f"{kind}:{key}"
+            src_sha = _sha256_file(p)
+
+            # Require a cache file AND a matching sha256 fingerprint entry.
             if not any(c.exists() for c in candidates):
+                missing.append(p)
+                continue
+
+            cached_fp = fingerprints.get(fp_key)
+            if not src_sha or not cached_fp or cached_fp.get("sha256") != src_sha:
                 missing.append(p)
         return missing
 
@@ -1297,6 +1417,16 @@ def cache_latents_to_disk(vae, dataset, config, accelerator, status_callback: Op
             }
             torch.save(data, save_path)
 
+            # Update fingerprint entry for safe reuse next run.
+            try:
+                key = _latent_cache_key(meta["root"], meta["path"])
+                fp_key = f"{meta['kind']}:{key}"
+                src_sha = _sha256_file(meta["path"])
+                if src_sha:
+                    fingerprints[fp_key] = {"sha256": src_sha}
+            except Exception:
+                pass
+
             # Write reverse-lookup info for humans/tools.
             try:
                 entry = {
@@ -1323,6 +1453,15 @@ def cache_latents_to_disk(vae, dataset, config, accelerator, status_callback: Op
                 status_callback(processed_items, total_items, 0.0, 0, None)
             
     info(f"Cached latents: instance={len(instance_missing)} class={len(class_missing)}")
+
+    # Persist fingerprints (best-effort, atomic-ish)
+    try:
+        tmp = fingerprints_path.with_suffix(".tmp")
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(fingerprints, f, ensure_ascii=False)
+        tmp.replace(fingerprints_path)
+    except Exception:
+        pass
     flush()
     if status_callback:
         try:

@@ -89,6 +89,7 @@
     "ema_decay": 0.995,
     "optimizer_args": null,
     "mixed_precision": "fp16",
+    "no_half_vae": true,
     "gradient_accumulation_steps": 1,
     "attention_backend": "sdpa",
     "allow_tf32": true,
