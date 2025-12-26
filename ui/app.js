@@ -1,5 +1,171 @@
 const API_BASE = "/api";
 
+const Lang = {
+    _strings: {},
+    _loaded: false,
+    _activeLanguage: 'en',
+    _availableLanguages: [],
+
+    load: async function() {
+        try {
+            const response = await fetch(`${API_BASE}/localization`);
+            if (!response.ok) return false;
+
+            const data = await response.json();
+            if (data.localization) {
+                this._strings = this._flatten(data.localization);
+                this._loaded = true;
+                this._activeLanguage = data.active || 'en';
+                this._availableLanguages = data.languages || [];
+                
+                this.updateSelector();
+                this.refresh();
+                
+                return true;
+            }
+            return false;
+        } catch (err) {
+            console.error('Failed to load localization:', err);
+            return false;
+        }
+    },
+
+    switchLanguage: async function(langCode) {
+        if (langCode === this._activeLanguage) return true;
+
+        try {
+            const response = await fetch(`${API_BASE}/localization/switch`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ lang_code: langCode })
+            });
+
+            if (!response.ok) return false;
+
+            const data = await response.json();
+            if (data.localization) {
+                this._strings = this._flatten(data.localization);
+                this._activeLanguage = data.active || langCode;
+                this.refresh();
+                return true;
+            }
+            return false;
+        } catch (err) {
+            console.error('Failed to switch language:', err);
+            return false;
+        }
+    },
+
+    refresh: function() {
+        // Handle text content
+        document.querySelectorAll('[data-lang-key]').forEach(el => {
+            // If element has data-lang-placeholder or data-lang-title with a value, 
+            // data-lang-key might be intended for text content (if it's not an input) 
+            // or it might be the old style. 
+            // But for now, let's assume data-lang-key always means textContent 
+            // UNLESS it's an input/textarea which doesn't have textContent in the same way.
+            // Actually, the safest bet is to separate them.
+            
+            // If the element is an input and has data-lang-placeholder, we shouldn't set textContent?
+            // The old logic was exclusive (if placeholder, set placeholder, else text).
+            
+            // New logic:
+            // data-lang-key -> textContent (or innerHTML if we want to be dangerous, but textContent is safer)
+            // data-lang-placeholder="key" -> placeholder
+            // data-lang-title="key" -> title
+            
+            const key = el.getAttribute('data-lang-key');
+            const params = el.getAttribute('data-lang-params');
+            let parsedParams = {};
+            if (params) {
+                try { parsedParams = JSON.parse(params); } catch (e) {}
+            }
+            
+            // Only set text content if it's not being used for something else in the old style
+            // But since I updated the HTML to use explicit keys for placeholders, 
+            // I can assume data-lang-key is for text.
+            // However, for inputs, setting textContent does nothing or is wrong.
+            if (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA' && el.tagName !== 'SELECT') {
+                 const value = this.get(key, parsedParams) || "";
+                 // If this element is intended to contain help HTML, preserve markup.
+                 if (el.classList && el.classList.contains('help-text')) {
+                     el.innerHTML = value;
+                 } else {
+                     el.textContent = value;
+                 }
+            }
+        });
+
+        // Handle placeholders
+        document.querySelectorAll('[data-lang-placeholder]').forEach(el => {
+            const key = el.getAttribute('data-lang-placeholder');
+            if (key) {
+                el.placeholder = this.get(key);
+            }
+        });
+
+        // Handle titles
+        document.querySelectorAll('[data-lang-title]').forEach(el => {
+            const key = el.getAttribute('data-lang-title');
+            if (key) {
+                el.title = this.get(key);
+            }
+        });
+        
+        const selector = document.getElementById('language-selector');
+        if (selector) selector.value = this._activeLanguage;
+    },
+    
+    updateSelector: function() {
+        const selector = document.getElementById('language-selector');
+        if (!selector) return;
+        
+        selector.innerHTML = '';
+        this._availableLanguages.forEach(lang => {
+            const option = document.createElement('option');
+            option.value = lang.code;
+            option.textContent = lang.name;
+            if (lang.code === this._activeLanguage) option.selected = true;
+            selector.appendChild(option);
+        });
+        
+        selector.onchange = (e) => this.switchLanguage(e.target.value);
+    },
+
+    _flatten: function(obj, prefix = '') {
+        const result = {};
+        for (const key in obj) {
+            if (!obj.hasOwnProperty(key)) continue;
+            const fullKey = prefix ? `${prefix}.${key}` : key;
+            const value = obj[key];
+            if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+                Object.assign(result, this._flatten(value, fullKey));
+            } else {
+                result[fullKey] = value;
+            }
+        }
+        return result;
+    },
+
+    get: function(key, params = {}) {
+        let text = this._strings[key];
+        if (text === undefined || text === null) return key;
+        if (params && typeof params === 'object') {
+            for (const param in params) {
+                if (params.hasOwnProperty(param)) {
+                    const placeholder = new RegExp(`\\{${param}\\}`, 'g');
+                    text = text.replace(placeholder, params[param]);
+                }
+            }
+        }
+        return text;
+    }
+};
+
+function lang(key, params = {}) {
+    return Lang.get(key, params);
+}
+
 // --- TABS ---
 function openTab(tabName) {
     // Hide all tab contents
@@ -157,10 +323,16 @@ async function applyUpdates() {
 }
 
 function openSubTab(tabName) {
+    const target = document.getElementById(tabName);
+    if (!target) {
+        console.error(`Sub-tab content not found: ${tabName}`);
+        return;
+    }
+
     document.querySelectorAll('.sub-tab-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.sub-tab-btn').forEach(el => el.classList.remove('active'));
     
-    document.getElementById(tabName).classList.add('active');
+    target.classList.add('active');
     document.querySelectorAll(`.sub-tab-btn[onclick="openSubTab('${tabName}')"]`).forEach(el => el.classList.add('active'));
 }
 
@@ -1045,7 +1217,7 @@ function buildDynamicFieldSet(containerId, defs) {
         const input = _buildFieldInput(def, value);
         const help = document.createElement("div");
         help.className = "help-text";
-        help.textContent = def.help || "";
+        help.innerHTML = def.help || "";
 
         group.appendChild(label);
         group.appendChild(input);
@@ -2209,6 +2381,15 @@ document.addEventListener("DOMContentLoaded", () => {
         guidanceSlider.addEventListener("input", updateGuidanceValue);
         updateGuidanceValue();
     }
+    
+    // Load language settings
+    Lang.load().then(loaded => {
+        if (loaded) {
+            console.log('Localization loaded:', Lang._activeLanguage);
+        } else {
+            console.log('Localization load failed or no changes');
+        }
+    });
 });
 
 // --- NOTIFICATIONS ---
@@ -2728,4 +2909,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    // Initialize localization
+    Lang.load();
 });

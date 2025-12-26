@@ -36,6 +36,9 @@ class AutoAdjustRequest(BaseModel):
 class UpdateApplyRequest(BaseModel):
     selected_paths: Optional[List[str]] = None
 
+class LocalizationSwitchRequest(BaseModel):
+    lang_code: str
+
 def init_app(root_path: Path):
     app = FastAPI(title="Onika Trainer")
     
@@ -57,6 +60,75 @@ def init_app(root_path: Path):
             vram = info["gpu"]["gpus"][0]["total_memory"]
             return suggest_optimizations(vram)
         return suggest_optimizations(0)
+
+    @app.get("/api/localization")
+    async def get_localization():
+        # Reload settings to get current language
+        settings = cs.reload_settings()
+        current_lang = settings.get("language", "en")
+        
+        # Get available languages
+        loc_dir = root_path / "config" / "localizations"
+        languages = []
+        if loc_dir.exists():
+            for f in loc_dir.glob("*.json"):
+                lang_name = f.stem.upper()
+                try:
+                    with open(f, "r", encoding="utf-8") as lf:
+                        ldata = json.load(lf)
+                        if "language_name" in ldata:
+                            lang_name = ldata["language_name"]
+                except:
+                    pass
+                languages.append({"code": f.stem, "name": lang_name})
+        
+        # Load current language file
+        lang_file = loc_dir / f"{current_lang}.json"
+        localization_data = {}
+        if lang_file.exists():
+            try:
+                with open(lang_file, "r", encoding="utf-8") as f:
+                    localization_data = json.load(f)
+            except Exception as e:
+                print(f"Error loading localization file: {e}")
+        
+        return {
+            "localization": localization_data,
+            "active": current_lang,
+            "languages": languages
+        }
+
+    @app.post("/api/localization/switch")
+    async def switch_language(data: LocalizationSwitchRequest):
+        # Update config file
+        config_path = root_path / "config" / "configs.json"
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                config = json.load(f)
+            
+            config["language"] = data.lang_code
+            
+            with open(config_path, "w", encoding="utf-8") as f:
+                json.dump(config, f, indent=4)
+                
+            # Reload settings in memory
+            cs.reload_settings()
+            
+            # Return new localization data
+            loc_dir = root_path / "config" / "localizations"
+            lang_file = loc_dir / f"{data.lang_code}.json"
+            localization_data = {}
+            if lang_file.exists():
+                with open(lang_file, "r", encoding="utf-8") as f:
+                    localization_data = json.load(f)
+            
+            return {
+                "localization": localization_data,
+                "active": data.lang_code
+            }
+            
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
     @app.get("/api/models")
     async def get_models():
