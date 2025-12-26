@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 **A Kohya_SS inspired LoRA trainer because everything else is dead or broken.**
 
 ## Just... why?
@@ -37,10 +36,7 @@ If this tool saves you from a mental breakdown, consider supporting the project.
 
 Maintenance is hard work and I'm doing this for free. Seeing people use it keeps me motivated to not let this end up in the "abandoned" pile.
 
-**[Insert Donation/Support Link Here]**
-
 ---
 *Happy Training!*
 =======
 .
->>>>>>> 6ee1f5a329941e556e63b5026336f449d54e49a2
