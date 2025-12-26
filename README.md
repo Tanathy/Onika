@@ -11,7 +11,6 @@ So I built **Onika**. It works, heavily inspired by Kohya_SS, but actually flexi
 **Early access. Expect chaos as I don't have $$$ Video Card to test every function one by one**
 
 It works, but it's not perfect yet. You'll find bugs. You'll have ideas.
-
 **Tell me about them.** I'm building this for us, so your feedback actually matters. I might even fix it.
 
 ## What it actually does
