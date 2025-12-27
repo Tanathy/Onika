@@ -1,4 +1,0 @@
----
-applyTo: '**'
----
-The current system is using pywebview for its GUI. The system called Onika is designed to be modular and extensible, allowing users to easily add new models, datasets, and training routines. The core components of the system include a Model Manager, Dataset Manager, and Training Manager, each responsible for handling their respective functionalities. The system is built with a focus on user-friendliness, providing a graphical interface that simplifies complex tasks related to AI model management and training. The system must be designed to train extra networks on custom datasets, making it a versatile tool for AI developers and enthusiasts creating specialized lora, embeddings, and other model enhancements for stable diffusion models.
