@@ -966,6 +966,17 @@ button:disabled {
     margin-top: 4px;
 }
 
+/* Drop-up variant (used by language selector) */
+.custom-select.drop-up .custom-options {
+    top: auto;
+    bottom: 100%;
+    margin-top: 0;
+    margin-bottom: 4px;
+    border-top: 1px solid var(--border);
+    border-bottom: 0;
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+}
+
 .custom-search {
     display: block;
     margin: 10px 12px 8px 12px;
@@ -983,6 +994,11 @@ button:disabled {
     visibility: visible;
     pointer-events: all;
     top: 100%;
+}
+
+.custom-select.drop-up.open .custom-options {
+    top: auto;
+    bottom: 100%;
 }
 
 .custom-option {

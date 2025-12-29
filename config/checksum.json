@@ -1,11 +1,12 @@
 {
   ".gitignore": "a5c67a33d2fcd871970aed708d9ac0a9c540530f2de7b5c8a1d38cb2b6003b82",
   "README.md": "d20f0e74df207640b3fb7d7aa35367dc954fa4065db34516cda824497d76d000",
-  "config/checksum.json": "a02de5ede27b9a0007741252031d29912f06e8a81280269826f0c6f219b4cd9d",
-  "config/configs.json": "3d5b70f6355e2f2cde009d58ba1aef1413d7dc8bdcdd14e7590d6f1a880e601d",
+  "config/checksum.json": "855f4f17d2cc44b67da3a82f4b70ff4cdb250695c91a71c1377cd7c62c369ae1",
+  "config/configs.json": "d090ef4532648b9af82ea86b5ccc2a161925103adf9d1f6f8811a6ca42c6222b",
   "config/localizations/de.json": "a40664a153d92e72605a0abcfef9b0413eafefc067dd274b2cbeaa2db9425681",
   "config/localizations/en.json": "543c59fc3e5df9b49128f034bdb863ab8f6cf5aa3c0899978cfc3ef0b34be5aa",
   "config/localizations/hu.json": "f1b3eff93481b3c2c9f10fb66ccedd5546cf85ad8230ee36766a011bf372216d",
+  "config/localizations/ru.json": "c481090236a4cd5597a0d0138cacfd9b9261adbabb060c5b72faf0286a484e04",
   "config/packages.jsonc": "5ad2364560d112f0a26619d6f04bdb0703770ca93c06403f984b74735b48487e",
   "config/training.json": "acd8978a8fffca43cdd694bfd3bbd6fbc09d70a8bf35fac5590971b6a0f89c3b",
   "presets/character_training.json": "f789875a1e8269bbe927bc2231586de9f465e48c12ec88945240eff73b607701",
@@ -35,9 +36,9 @@
   "system/training/schema.py": "6875b377c69b7cd8be7797c48f0ade5e6310f6e36f0a91ffa4e8f448b598373b",
   "system/updater.py": "7155a8888b84f9cc2494e1576e7bb4a820a5873e87a0796cf5613060b3b1bf74",
   "ui/Inter.ttf": "0be2399ea925f1f83ff974764761da9860ec50742ed29a5d4c1ffd0c5c7ac3a8",
-  "ui/app.js": "cdb23bafde437f14f452cfbfe905372ddd0cabf097695cfe5c76738cfaadb17a",
+  "ui/app.js": "cf13a8ee82c521d3cc70f522793a7ba1af56657d4bbee5df98c2d0217c00e032",
   "ui/favicon.ico": "ee78717d89ef1365513092650abad8377540d1cf6469e23e6b349781490b12b8",
   "ui/icon.png": "c5671a0fecc76721c2d9cd243e2ca461029c2e5edc638d244186ed8010a59c7f",
   "ui/index.html": "379f05db5b2f3e342d234fdc606a5df7f5df4d64e3499e219a9c44c92b5ecf2d",
-  "ui/style.css": "089af16f33b1201c78fa015888acd3a2b34c1e655f923897f4ea8663e2aa9759"
+  "ui/style.css": "764027f46546f0bc98313746aec0b659ba6101eeb77f15ad9e2bf1c6f3a20494"
 }

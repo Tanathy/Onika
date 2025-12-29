@@ -2505,6 +2505,11 @@ function buildCustomDropdown(select) {
     const customSelect = document.createElement('div');
     customSelect.className = 'custom-select';
 
+    // Language selector should open upwards (drop-up) to avoid being clipped by content below.
+    if (select && select.id === 'language-selector') {
+        customSelect.classList.add('drop-up');
+    }
+
     const trigger = document.createElement('div');
     trigger.className = 'custom-select-trigger';
     const triggerSpan = document.createElement('span');
