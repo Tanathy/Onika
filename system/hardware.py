@@ -920,3 +920,54 @@ class MemoryManager:
     def cleanup_after_generation(self):
         """Clean up memory after generation."""
         soft_empty_cache()
+
+
+def suggest_optimizations(vram_gb: float) -> Dict[str, Any]:
+    """
+    Suggest optimizations based on available VRAM.
+    """
+    suggestions = {
+        "optimizations": [],
+        "warnings": [],
+        "settings": {
+            "low_vram": False,
+            "cpu_offload": False,
+            "attention_slicing": False,
+            "vae_slicing": False
+        }
+    }
+    
+    if vram_gb == 0:
+        suggestions["warnings"].append("No GPU detected or CPU mode forced.")
+        suggestions["settings"]["low_vram"] = True
+        return suggestions
+
+    # VRAM thresholds (in GB)
+    LOW_VRAM_THRESHOLD = 6.0
+    MEDIUM_VRAM_THRESHOLD = 10.0
+    
+    if vram_gb < LOW_VRAM_THRESHOLD:
+        suggestions["optimizations"].append("Enable Low VRAM mode")
+        suggestions["optimizations"].append("Use CPU offloading")
+        suggestions["optimizations"].append("Enable Attention Slicing")
+        suggestions["optimizations"].append("Enable VAE Slicing")
+        suggestions["settings"]["low_vram"] = True
+        suggestions["settings"]["cpu_offload"] = True
+        suggestions["settings"]["attention_slicing"] = True
+        suggestions["settings"]["vae_slicing"] = True
+        
+    elif vram_gb < MEDIUM_VRAM_THRESHOLD:
+        suggestions["optimizations"].append("Enable Balanced mode")
+        suggestions["optimizations"].append("Use CPU offloading for larger models")
+        suggestions["settings"]["low_vram"] = False
+        suggestions["settings"]["cpu_offload"] = True
+        
+    else:
+        suggestions["optimizations"].append("High Performance mode available")
+        suggestions["settings"]["low_vram"] = False
+        suggestions["settings"]["cpu_offload"] = False
+        
+    if platform.system() == "Linux":
+        suggestions["optimizations"].append("Linux detected: Ensure CUDA drivers are up to date")
+        
+    return suggestions

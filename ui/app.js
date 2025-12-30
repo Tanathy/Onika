@@ -204,8 +204,8 @@ async function checkUpdates() {
     const summary = document.getElementById('update-summary');
 
     btn.disabled = true;
-    btn.textContent = 'Checking...';
-    statusText.textContent = 'Checking for updates...';
+    btn.textContent = lang('ui.updates.btn_checking');
+    statusText.textContent = lang('ui.updates.status_checking');
     applyBtn.style.display = 'none';
     infoCard.style.display = 'none';
 
@@ -217,11 +217,11 @@ async function checkUpdates() {
             _pendingUpdates = data.files || [];
             
             if (data.has_updates) {
-                statusText.textContent = `Found ${data.files.length} update(s) available.`;
+                statusText.textContent = lang('ui.updates.found_updates', { count: data.files.length });
                 applyBtn.style.display = 'block';
                 infoCard.style.display = 'block';
                 
-                summary.textContent = `Checked at: ${new Date(data.checked_at).toLocaleString()}`;
+                summary.textContent = lang('ui.updates.checked_at', { date: new Date(data.checked_at).toLocaleString() });
                 
                 fileList.innerHTML = '';
                 data.files.forEach(file => {
@@ -245,22 +245,22 @@ async function checkUpdates() {
                     fileList.appendChild(item);
                 });
                 
-                showNotification('Updates available!', 'info');
+                showNotification(lang('ui.notifications.updates_available'), 'info');
             } else {
-                statusText.textContent = 'Your system is up to date.';
-                showNotification('No updates found.', 'success');
+                statusText.textContent = lang('ui.updates.status_uptodate');
+                showNotification(lang('ui.notifications.no_updates'), 'success');
             }
         } else {
-            statusText.textContent = 'Failed to check for updates.';
-            showNotification(data.messageParams?.error || 'Update check failed', 'error');
+            statusText.textContent = lang('ui.updates.status_failed');
+            showNotification(data.messageParams?.error || lang('ui.notifications.update_check_failed'), 'error');
         }
     } catch (error) {
         console.error('Update check error:', error);
-        statusText.textContent = 'Error connecting to update server.';
-        showNotification('Connection error', 'error');
+        statusText.textContent = lang('ui.updates.status_error');
+        showNotification(lang('ui.notifications.connection_error'), 'error');
     } finally {
         btn.disabled = false;
-        btn.textContent = 'Check for Updates';
+        btn.textContent = lang('ui.updates.btn_check');
     }
 }
 
@@ -271,14 +271,14 @@ async function applyUpdates() {
     const logCard = document.getElementById('update-log-card');
     const logArea = document.getElementById('update-log');
 
-    if (!confirm(`Are you sure you want to apply ${_pendingUpdates.length} update(s)?`)) {
+    if (!confirm(lang('ui.modals.update_confirm', { count: _pendingUpdates.length }) || `Are you sure you want to apply ${_pendingUpdates.length} update(s)?`)) {
         return;
     }
 
     btn.disabled = true;
     checkBtn.disabled = true;
-    btn.textContent = 'Applying...';
-    statusText.textContent = 'Applying updates...';
+    btn.textContent = lang('ui.updates.btn_applying') || 'Applying...';
+    statusText.textContent = lang('ui.updates.status_applying');
     logCard.style.display = 'block';
     logArea.innerHTML = 'Starting update process...\n';
 
@@ -291,34 +291,34 @@ async function applyUpdates() {
         const data = await response.json();
 
         if (data.status === 'success' || data.status === 'partial') {
-            logArea.innerHTML += `Updated ${data.updated.length} files.\n`;
+            logArea.innerHTML += lang('ui.updates.updated_count', { count: data.updated.length }) + '\n';
             if (data.failed.length > 0) {
-                logArea.innerHTML += `Failed to update ${data.failed.length} files.\n`;
+                logArea.innerHTML += lang('ui.updates.failed_count', { count: data.failed.length }) + '\n';
                 data.failed.forEach(f => {
-                    logArea.innerHTML += `Error on ${f.path}: ${f.error}\n`;
+                    logArea.innerHTML += lang('ui.updates.file_error', { path: f.path, error: f.error }) + '\n';
                 });
             }
             
-            statusText.textContent = data.status === 'success' ? 'Updates applied successfully!' : 'Updates completed with some errors.';
-            showNotification(data.status === 'success' ? 'Update complete!' : 'Update partial', data.status === 'success' ? 'success' : 'warning');
+            statusText.textContent = data.status === 'success' ? lang('ui.updates.apply_success') : lang('ui.updates.apply_partial');
+            showNotification(data.status === 'success' ? lang('ui.notifications.update_complete') : lang('ui.notifications.update_partial'), data.status === 'success' ? 'success' : 'warning');
             
             if (data.status === 'success') {
                 btn.style.display = 'none';
             }
         } else {
-            statusText.textContent = 'Failed to apply updates.';
-            logArea.innerHTML += `Error: ${data.messageParams?.error || 'Unknown error'}\n`;
-            showNotification('Update failed', 'error');
+            statusText.textContent = lang('ui.updates.status_failed');
+            logArea.innerHTML += `Error: ${data.messageParams?.error || lang('ui.common.unknown_error')}\n`;
+            showNotification(lang('ui.notifications.update_failed'), 'error');
         }
     } catch (error) {
         console.error('Update apply error:', error);
-        statusText.textContent = 'Error applying updates.';
+        statusText.textContent = lang('ui.updates.status_error');
         logArea.innerHTML += `Connection error: ${error.message}\n`;
-        showNotification('Connection error', 'error');
+        showNotification(lang('ui.notifications.connection_error'), 'error');
     } finally {
         btn.disabled = false;
         checkBtn.disabled = false;
-        btn.textContent = 'Apply Updates';
+        btn.textContent = lang('ui.updates.btn_apply');
     }
 }
 
@@ -843,7 +843,7 @@ async function loadSelectedPreset() {
     const select = document.getElementById("preset_selector");
     const presetName = select.value;
     if (!presetName) {
-        showNotification("Please select a preset to load.", 'error');
+        showNotification(lang('ui.notifications.select_preset_load'), 'error');
         return;
     }
     
@@ -859,10 +859,10 @@ async function loadSelectedPreset() {
         buildDynamicOptimizationFields();
         renderOptimizerArgHints();
         syncCustomDropdownsWithin(document.getElementById("training-form"));
-        showNotification(`Loaded preset: ${presetName}`, 'success');
+        showNotification(lang('ui.notifications.preset_loaded', { name: presetName }), 'success');
     } catch (e) {
         console.error("Failed to load preset", e);
-        showNotification("Failed to load preset", 'error');
+        showNotification(lang('ui.notifications.preset_load_failed'), 'error');
     }
 }
 
@@ -1518,13 +1518,15 @@ function updateStatusUI(data) {
         
         if (data.training.is_training) {
             btnToggle.disabled = false;
-            btnToggle.textContent = "Stop Training";
-            btnToggle.className = "btn-danger";
+            btnToggle.textContent = lang('ui.training.progress.stop');
+            btnToggle.classList.remove("btn-primary");
+            btnToggle.classList.add("btn-danger");
             trainingDot.className = "status-dot running";
         } else {
             btnToggle.disabled = false;
-            btnToggle.textContent = "Start Training";
-            btnToggle.className = "btn-primary";
+            btnToggle.textContent = lang('ui.training.progress.start');
+            btnToggle.classList.remove("btn-danger");
+            btnToggle.classList.add("btn-primary");
             trainingDot.className = "status-dot" + (data.training.status === "completed" ? " success" : "");
         }
 
@@ -1589,8 +1591,10 @@ function updateTrainingTelemetry(training) {
     const epochText = document.getElementById("console-epoch-text");
 
     const isTraining = training.status === "training";
-    const isCachingLatents = training.status === "caching_latents";
-    const isEtaPhase = isTraining || isCachingLatents;
+    const isCachingLatents = training.status === 'running' && training.step === 0;
+    const statusText = training.status === 'running' 
+        ? (isCachingLatents ? lang('ui.training.progress.caching_latents') : lang('ui.sidebar.training')) 
+        : (training.status === 'idle' ? lang('ui.training.progress.idle') : training.status);
 
     // Phase transitions: reset phase-specific timers
     if (_telemetryPhase !== training.status) {
@@ -1640,7 +1644,7 @@ function updateTrainingTelemetry(training) {
         if (progressText) progressText.textContent = `${training.progress.toFixed(1)}%`;
     }
     if (epochText && typeof training.epoch === 'number') {
-        epochText.textContent = isCachingLatents ? "Latents Cache" : `Epoch ${training.epoch}`;
+        epochText.textContent = isCachingLatents ? lang('ui.training.progress.latents_cache') : `${lang('ui.training.progress.epoch_prefix')} ${training.epoch}`;
     }
 
     // ETA Calculation (Training)
@@ -1863,12 +1867,12 @@ async function saveTrainingConfig() {
             body: JSON.stringify(config)
         });
         if (res.ok) {
-            showNotification("Configuration saved!", 'success');
+            showNotification(lang('ui.notifications.config_saved'), 'success');
         } else {
-            showNotification("Failed to save configuration.", 'error');
+            showNotification(lang('ui.notifications.config_save_failed'), 'error');
         }
     } catch (e) {
-        showNotification(`Error saving config: ${e}`, 'error');
+        showNotification(lang('ui.notifications.config_save_error', { error: e }), 'error');
     }
 }
 
@@ -1889,11 +1893,11 @@ async function autoOptimize() {
             }
         }
         
-        showNotification("Applied hardware optimizations!", 'success');
+        showNotification(lang('ui.notifications.hardware_optimized'), 'success');
         updateNetworkFields();
     } catch (e) {
         console.error("Failed to get optimizations", e);
-        showNotification("Failed to get hardware optimizations", 'error');
+        showNotification(lang('ui.notifications.hardware_optimize_failed'), 'error');
     }
 }
 
@@ -1908,7 +1912,7 @@ async function autoAdjust() {
 
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
-            showNotification(err.detail || 'Auto Adjust failed', 'error');
+            showNotification(err.detail || lang('ui.notifications.auto_adjust_failed'), 'error');
             return;
         }
 
@@ -1916,7 +1920,7 @@ async function autoAdjust() {
         const patch = data && data.patch ? data.patch : {};
 
         if (!patch || Object.keys(patch).length === 0) {
-            showNotification('Auto Adjust: no changes suggested (dataset missing?)', 'warning');
+            showNotification(lang('ui.notifications.auto_adjust_no_changes'), 'warning');
             return;
         }
 
@@ -1930,11 +1934,11 @@ async function autoAdjust() {
         syncCustomDropdownsWithin(document.getElementById('training-form'));
 
         const n = data?.stats?.image_count;
-        const msg = typeof n === 'number' ? `Auto Adjust applied (dataset: ${n} images).` : 'Auto Adjust applied.';
+        const msg = typeof n === 'number' ? lang('ui.notifications.auto_adjust_success_count', { count: n }) : lang('ui.notifications.auto_adjust_success');
         showNotification(msg, 'success');
     } catch (e) {
         console.error('Auto Adjust error:', e);
-        showNotification('Auto Adjust failed', 'error');
+        showNotification(lang('ui.notifications.auto_adjust_failed'), 'error');
     }
 }
 
@@ -1942,7 +1946,7 @@ async function saveSelectedPreset() {
     const select = document.getElementById("preset_selector");
     const presetName = select.value;
     if (!presetName) {
-        showNotification("Please select a preset to save to.", 'error');
+        showNotification(lang('ui.notifications.select_preset_save'), 'error');
         return;
     }
     
@@ -1954,25 +1958,25 @@ async function saveSelectedPreset() {
             body: JSON.stringify(config)
         });
         if (res.ok) {
-            showNotification(`Preset saved: ${presetName}`, 'success');
+            showNotification(lang('ui.notifications.preset_saved', { name: presetName }), 'success');
         } else {
-            showNotification("Failed to save preset.", 'error');
+            showNotification(lang('ui.notifications.preset_save_failed'), 'error');
         }
     } catch (e) {
-        showNotification(`Error saving preset: ${e}`, 'error');
+        showNotification(lang('ui.notifications.preset_save_error', { error: e }), 'error');
     }
 }
 
 async function saveNewPreset() {
     const presetName = document.getElementById("preset-name-input").value.trim();
     if (!presetName) {
-        showNotification("Preset name cannot be empty.", 'error');
+        showNotification(lang('ui.notifications.preset_name_empty'), 'error');
         return;
     }
     
     // Validate preset name (alphanumeric, underscore, hyphen only)
     if (!/^[a-zA-Z0-9_-]+$/.test(presetName)) {
-        showNotification("Preset name can only contain letters, numbers, underscores, and hyphens.", 'error');
+        showNotification(lang('ui.notifications.preset_name_invalid'), 'error');
         return;
     }
     
@@ -1984,17 +1988,17 @@ async function saveNewPreset() {
             body: JSON.stringify(config)
         });
         if (res.ok) {
-            showNotification(`Preset created: ${presetName}`, 'success');
+            showNotification(lang('ui.notifications.preset_created', { name: presetName }), 'success');
             closePresetModal();
             // Refresh presets list and select the new one
             await fetchPresets();
             document.getElementById("preset_selector").value = presetName;
             refreshCustomDropdown(document.getElementById("preset_selector"));
         } else {
-            showNotification("Failed to create preset.", 'error');
+            showNotification(lang('ui.notifications.preset_create_failed'), 'error');
         }
     } catch (e) {
-        showNotification(`Error creating preset: ${e}`, 'error');
+        showNotification(lang('ui.notifications.preset_create_error', { error: e }), 'error');
     }
 }
 
@@ -2002,7 +2006,7 @@ async function deleteSelectedPreset() {
     const select = document.getElementById("preset_selector");
     const presetName = select.value;
     if (!presetName) {
-        showNotification("Please select a preset to delete.", 'error');
+        showNotification(lang('ui.notifications.select_preset_delete'), 'error');
         return;
     }
     
@@ -2035,22 +2039,22 @@ async function confirmDeletePreset() {
             method: "DELETE"
         });
         if (res.ok) {
-            showNotification(`Preset deleted: ${presetName}`, 'success');
+            showNotification(lang('ui.notifications.preset_deleted', { name: presetName }), 'success');
             closeDeleteModal();
             await fetchPresets();
             select.value = "";
             refreshCustomDropdown(select);
         } else {
-            showNotification("Failed to delete preset.", 'error');
+            showNotification(lang('ui.notifications.preset_delete_failed'), 'error');
         }
     } catch (e) {
-        showNotification(`Error deleting preset: ${e}`, 'error');
+        showNotification(lang('ui.notifications.preset_delete_error', { error: e }), 'error');
     }
 }
 
 async function toggleTraining() {
     const btn = document.getElementById("btn-toggle-train");
-    if (btn.textContent === "Start Training") {
+    if (btn.textContent === lang('ui.training.progress.start')) {
         await startTraining();
     } else {
         await stopTraining();
@@ -2073,21 +2077,21 @@ async function startTraining() {
         });
         const result = await res.json();
         if (res.ok) {
-            showNotification(`Training started! Job ID: ${result.job_id}`, 'success');
+            showNotification(lang('ui.notifications.training_started', { job_id: result.job_id }), 'success');
             fetchStatus();
             
             // Update console status
             const statusEl = document.getElementById("console-status");
-            if (statusEl) statusEl.textContent = "Starting...";
+            if (statusEl) statusEl.textContent = lang('ui.common.starting');
             
             // Reset console stats
             resetConsoleStats();
         } else {
-            showNotification(`Error: ${result.detail}`, 'error');
+            showNotification(lang('ui.notifications.training_start_error', { error: result.detail }), 'error');
             if (btn) btn.disabled = false;
         }
     } catch (e) {
-        showNotification(`Error starting training: ${e}`, 'error');
+        showNotification(lang('ui.notifications.training_start_failed', { error: e }), 'error');
         if (btn) btn.disabled = false;
     }
 }
@@ -2111,7 +2115,7 @@ async function confirmStopTraining() {
     
     // Update console status
     const statusEl = document.getElementById("console-status");
-    if (statusEl) statusEl.textContent = "Stopped";
+    if (statusEl) statusEl.textContent = lang('ui.common.stopped');
 }
 
 function resetConsoleStats() {
@@ -2134,7 +2138,7 @@ async function fetchOutputs() {
         const select = document.getElementById("meta-file-select");
         
         // Keep the first option
-        select.innerHTML = '<option value="">-- Select a file --</option>';
+        select.innerHTML = `<option value="">${lang('ui.common.select_file')}</option>`;
         
         files.forEach(f => {
             const opt = document.createElement("option");
@@ -2157,7 +2161,7 @@ async function loadMetadata() {
 
     try {
         const res = await fetch(`${API_BASE}/metadata/${filename}`);
-        if (!res.ok) throw new Error("Failed to load metadata");
+        if (!res.ok) throw new Error(lang('ui.notifications.metadata_load_failed'));
         
         const data = await res.json();
         renderMetadataEditor(data);
@@ -2215,12 +2219,12 @@ async function saveMetadata() {
         });
         
         if (res.ok) {
-            showNotification("Metadata saved successfully!", 'success');
+            showNotification(lang('ui.notifications.metadata_saved'), 'success');
         } else {
-            showNotification("Failed to save metadata", 'error');
+            showNotification(lang('ui.notifications.metadata_save_failed'), 'error');
         }
     } catch (e) {
-        showNotification("Error saving metadata: " + e, 'error');
+        showNotification(lang('ui.notifications.metadata_save_error', { error: e }), 'error');
     }
 }
 
@@ -2228,7 +2232,7 @@ async function saveMetadata() {
 
 async function refreshConversionFiles() {
     const select = document.getElementById('conv_input_file');
-    select.innerHTML = '<option value="">Loading...</option>';
+    select.innerHTML = `<option value="">${lang('ui.common.loading')}</option>`;
     
     // Get output_dir from the training form (the input has name="output_dir", not id)
     const form = document.getElementById('training-form');
@@ -2248,7 +2252,7 @@ async function refreshConversionFiles() {
         
         const files = await res.json();
         
-        select.innerHTML = '<option value="">Select a file from outputs...</option>';
+        select.innerHTML = `<option value="">${lang('ui.common.select_output_file')}</option>`;
         files.forEach(f => {
             if (f.name.endsWith('.safetensors')) {
                 const opt = document.createElement('option');
@@ -2259,7 +2263,7 @@ async function refreshConversionFiles() {
         });
         
         if (files.length === 0) {
-            select.innerHTML += '<option disabled>No .safetensors files found</option>';
+            select.innerHTML += `<option disabled>${lang('ui.common.no_files_found')}</option>`;
         }
 
         // Critical: our UI uses a custom dropdown renderer. Updating the native <select>
@@ -2268,8 +2272,8 @@ async function refreshConversionFiles() {
             refreshCustomDropdown(select);
         }
     } catch (e) {
-        showNotification(`Failed to load output files: ${e.message}`, "error");
-        select.innerHTML = '<option value="">Error loading files (check console)</option>';
+        showNotification(lang('ui.notifications.output_load_failed', { error: e.message }), "error");
+        select.innerHTML = `<option value="">${lang('ui.notifications.output_load_failed', { error: '' })}</option>`;
 
         if (typeof refreshCustomDropdown === 'function') {
             refreshCustomDropdown(select);
@@ -2284,13 +2288,13 @@ async function startConversion() {
     const outputName = document.getElementById('conv_output_name').value;
     
     if (!filePath) {
-        showNotification("Please select an input file", "error");
+        showNotification(lang('ui.notifications.select_input_file'), "error");
         return;
     }
     
     const btn = document.querySelector('#tab-conversion .btn-primary');
     const originalText = btn.textContent;
-    btn.textContent = "Converting...";
+    btn.textContent = lang('ui.common.converting');
     btn.disabled = true;
     
     document.getElementById('conv-result').classList.add('hidden');
@@ -2310,17 +2314,17 @@ async function startConversion() {
         const data = await res.json();
         
         if (res.ok) {
-            showNotification("Conversion successful!", "success");
+            showNotification(lang('ui.notifications.conversion_success'), "success");
             document.getElementById('conv-result').classList.remove('hidden');
             document.getElementById('conv-result-path').textContent = `Saved to: ${data.output_path}`;
             // Refresh list so the new file appears
             refreshConversionFiles();
         } else {
-            showNotification(`Conversion failed: ${data.detail}`, "error");
+            showNotification(lang('ui.notifications.conversion_failed', { error: data.detail }), "error");
         }
     } catch (e) {
         console.error(e);
-        showNotification(`Conversion error: ${e.message}`, "error");
+        showNotification(lang('ui.notifications.conversion_error', { error: e.message }), "error");
     } finally {
         btn.textContent = originalText;
         btn.disabled = false;
