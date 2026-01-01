@@ -1,4 +1,4 @@
-const API_BASE = "/api";
+// API_BASE is defined in const.js
 
 const Lang = {
     _strings: {},
@@ -186,9 +186,13 @@ function openTab(tabName) {
     }
     if (tabName === 'console') {
         drawChart();
+        scanDataset();
     }
     if (tabName === 'updates') {
         // Updates tab opened
+    }
+    if (tabName === 'augmentation') {
+        // Augmentation tab opened
     }
 }
 
@@ -355,8 +359,7 @@ let _xrefPointers = [];
 let _xrefActiveKeys = new Set();
 let _xrefHighlightTimers = new WeakMap();
 
-const XREF_HIGHLIGHT_MS = 5000;
-const XREF_POINTER_FADE_MS = 900;
+// XREF constants are defined in const.js
 
 function _cssEscape(s) {
     if (window.CSS && typeof window.CSS.escape === 'function') return window.CSS.escape(s);
@@ -1033,108 +1036,7 @@ function getFormControls(name) {
 }
 
 // --- DYNAMIC LOSS / OPTIM FIELDS ---
-const LOSS_FIELD_DEFS = [
-    {
-        name: "loss_type",
-        type: "select",
-        label: "Loss Type",
-        help: "Determines how the error between the generated image and the target is calculated. 'L2' (MSE) is the standard, penalizing large errors heavily for smooth convergence. 'Huber' is a hybrid that is less sensitive to outliers, while 'L1' (MAE) can provide sharper results but may be less stable. L2 is recommended for most training scenarios.",
-        options: [
-            { value: "l2", label: "L2 (MSE)" },
-            { value: "huber", label: "Huber" },
-            { value: "smooth_l1", label: "Smooth L1" },
-            { value: "l1", label: "L1 (MAE)" },
-        ],
-    },
-    {
-        name: "debiased_estimation_loss",
-        type: "checkbox",
-        label: "Debiased Estimation Loss",
-        help: "Corrects for the bias introduced by the Min-SNR weighting strategy, keeping the training mathematically grounded. Note that this can slightly affect convergence speed or the effective learning rate balance.",
-    },
-    {
-        name: "min_snr_gamma",
-        type: "number",
-        step: "0.1",
-        label: "Min SNR Gamma",
-        help: "Balances training focus across different noise levels. This is essential for zero-terminal-SNR models like SDXL to learn structural details. A value of 5.0 is recommended for SDXL; setting this to 0 on v-prediction models may result in noisy or broken images.",
-        defaultValue: 0,
-    },
-    {
-        name: "snr_gamma",
-        type: "number",
-        step: "0.1",
-        label: "SNR Gamma (Alias)",
-        help: "Alternative name for Min SNR Gamma used by some legacy scripts. Same effect as above.",
-        defaultValue: 5.0,
-    },
-    {
-        name: "prior_loss_weight",
-        type: "number",
-        step: "0.1",
-        label: "Prior Loss Weight",
-        help: "Controls the relative importance of regularization images versus training images. Higher values (e.g., 1.0) strongly preserve the original class (e.g., 'person'), while lower values allow the model to drift more towards the target style. Setting this too low can lead to catastrophic forgetting of the base concept.",
-        defaultValue: 1.0,
-        showIf: { field: "use_prior_preservation", equals: true },
-    },
-    {
-        name: "scheduled_huber_schedule",
-        type: "select",
-        label: "Scheduled Huber Schedule",
-        help: "Defines how the Huber loss threshold evolves over time, allowing for a transition between robust and precise loss calculations. 'Constant' is the most stable option.",
-        options: [
-            { value: "constant", label: "Constant" },
-            { value: "exponential", label: "Exponential" },
-            { value: "snr", label: "SNR-based" },
-        ],
-    },
-    {
-        name: "scheduled_huber_c",
-        type: "number",
-        step: "0.01",
-        label: "Scheduled Huber C",
-        help: "The threshold where Huber loss transitions from quadratic (L2) to linear (L1), controlling sensitivity to outliers. Lower values increase robustness, while higher values behave more like standard L2 loss.",
-        defaultValue: 0.1,
-    },
-    {
-        name: "scheduled_huber_scale",
-        type: "number",
-        step: "0.1",
-        label: "Scheduled Huber Scale",
-        help: "Global multiplier for the Huber loss. Used to balance the loss magnitude against other loss components.",
-        defaultValue: 1.0,
-    },
-    {
-        name: "scale_weight_norms",
-        type: "number",
-        step: "0.1",
-        label: "Scale Weight Norms",
-        help: "Rescales network weights to maintain them within a specific range, which can prevent exploding gradients in deep networks or when using high learning rates. This is typically not required for standard LoRA training.",
-    },
-];
-
-const OPTIM_FIELD_DEFS = [
-    {
-        name: "gradient_checkpointing",
-        type: "checkbox",
-        label: "Gradient Checkpointing",
-        help: "Reduces VRAM usage by re-calculating parts of the model during the backward pass instead of storing them in memory. This enables larger batch sizes at the cost of a 20-30% reduction in training speed.",
-    },
-    {
-        name: "max_grad_norm",
-        type: "number",
-        step: "0.1",
-        label: "Max Grad Norm",
-        help: "Clips gradient spikes to a specified value to prevent 'exploding gradients,' which can cause the model to produce NaN or black images. A value of 1.0 is the industry standard.",
-        defaultValue: 1.0,
-    },
-    {
-        name: "no_half_vae",
-        type: "checkbox",
-        label: "No Half VAE",
-        help: "Forces the VAE to operate in float32 precision to prevent NaN errors (black squares), which are common with the SDXL VAE in lower precision. This improves stability but increases VRAM consumption.",
-    },
-];
+// LOSS_FIELD_DEFS and OPTIM_FIELD_DEFS are defined in const.js
 
 let _latestConfigSnapshot = {};
 
@@ -1165,7 +1067,8 @@ function _buildFieldInput(def, value) {
         def.options.forEach(opt => {
             const optionEl = document.createElement("option");
             optionEl.value = opt.value;
-            optionEl.textContent = opt.label;
+            optionEl.textContent = Lang.get(opt.label);
+            optionEl.setAttribute('data-lang-key', opt.label);
             if (String(value) === String(opt.value)) optionEl.selected = true;
             input.appendChild(optionEl);
         });
@@ -1221,12 +1124,14 @@ function buildDynamicFieldSet(containerId, defs) {
         if (def.showIf) group.dataset.showIf = JSON.stringify(def.showIf);
 
         const label = document.createElement("label");
-        label.textContent = def.label;
+        label.textContent = Lang.get(def.label);
+        label.setAttribute('data-lang-key', def.label);
 
         const input = _buildFieldInput(def, value);
         const help = document.createElement("div");
         help.className = "help-text";
-        help.innerHTML = def.help || "";
+        help.innerHTML = Lang.get(def.help) || "";
+        if (def.help) help.setAttribute('data-lang-key', def.help);
 
         group.appendChild(label);
         group.appendChild(input);
@@ -1265,17 +1170,7 @@ function buildDynamicOptimizationFields() {
 }
 
 // Optimizer arg helper pills
-const OPTIMIZER_ARG_SUGGESTIONS = {
-    AdamW: ["weight_decay=0.01", "betas=(0.9,0.999)", "eps=1e-8"],
-    AdamW8bit: ["weight_decay=0.01", "betas=(0.9,0.999)", "eps=1e-8"],
-    Lion: ["weight_decay=0.01", "betas=(0.9,0.99)", "eps=1e-8"],
-    Lion8bit: ["weight_decay=0.01", "betas=(0.9,0.99)", "eps=1e-8"],
-    DAdaptAdam: ["weight_decay=0.01", "decouple=True"],
-    Prodigy: ["weight_decay=0.01", "decouple=True"],
-    CAME: ["weight_decay=0.01", "betas=(0.9,0.999)", "eps=1e-8"],
-    Adafactor: ["relative_step=True", "scale_parameter=True", "warmup_init=True", "weight_decay=0.0"],
-    SGD: ["weight_decay=0.0", "momentum=0.9"],
-};
+// OPTIMIZER_ARG_SUGGESTIONS is defined in const.js
 
 function renderOptimizerArgHints() {
     const form = document.getElementById("training-form");
@@ -1343,7 +1238,7 @@ function renderOptimizerArgHints() {
 
 // --- CHART ---
 let lossHistory = [];
-const MAX_POINTS = 200; // Increased for better resolution
+// MAX_POINTS is defined in const.js
 
 function drawChart() {
     const canvas = document.getElementById("loss-chart");
@@ -1501,7 +1396,14 @@ function updateStatusUI(data) {
         }
 
         if (data.system.cpu) {
-            if (cpuLoadEl) cpuLoadEl.textContent = `${data.system.cpu.cpu_count} Cores`;
+            if (cpuLoadEl) {
+                // Use cpu_percent if available, otherwise fallback to core count
+                if (data.system.cpu.cpu_percent !== undefined) {
+                    cpuLoadEl.textContent = `${data.system.cpu.cpu_percent}%`;
+                } else {
+                    cpuLoadEl.textContent = `${data.system.cpu.cpu_count} Cores`;
+                }
+            }
             if (ramEl) {
                 const usedRam = data.system.cpu.total_ram - data.system.cpu.available_ram;
                 ramEl.textContent = `${usedRam.toFixed(1)} / ${data.system.cpu.total_ram.toFixed(1)} GB`;
@@ -1601,7 +1503,8 @@ function updateTrainingTelemetry(training) {
 
     const isTraining = training.status === "training";
     const isCachingLatents = training.status === 'running' && training.step === 0;
-    const statusText = training.status === 'running' 
+    const isEtaPhase = isTraining || isCachingLatents;
+    const statusText = training.status === 'running'
         ? (isCachingLatents ? lang('ui.training.progress.caching_latents') : lang('ui.sidebar.training')) 
         : (training.status === 'idle' ? lang('ui.training.progress.idle') : training.status);
 
@@ -2399,6 +2302,9 @@ document.addEventListener("DOMContentLoaded", () => {
     Lang.load().then(loaded => {
         if (loaded) {
             console.log('Localization loaded:', Lang._activeLanguage);
+            // Re-render dynamic fields to ensure translations are applied
+            buildDynamicLossFields();
+            buildDynamicOptimizationFields();
         } else {
             console.log('Localization load failed or no changes');
         }
@@ -2745,64 +2651,7 @@ function toggleRegGenSettings(checkbox) {
 // LOSS OPTIMIZATION PRESETS & AUTO TOGGLES
 // ============================================
 
-const LOSS_PRESETS = {
-    default: {
-        loss_type: 'l2',
-        huber_c: 0.1,
-        snr_gamma: 0,
-        snr_gamma_auto: false,
-        v_pred_like_loss: 0,
-        noise_offset_strength: 0,
-        noise_offset_auto: false,
-        ip_noise_gamma: 0,
-        zero_terminal_snr: false,
-        debiased_estimation_loss: false,
-        scale_v_pred_loss_like_noise_pred: false,
-        masked_loss: false
-    },
-    balanced: {
-        loss_type: 'l2',
-        huber_c: 0.1,
-        snr_gamma: 5,
-        snr_gamma_auto: true,
-        v_pred_like_loss: 0,
-        noise_offset_strength: 0.0357,
-        noise_offset_auto: true,
-        ip_noise_gamma: 0,
-        zero_terminal_snr: true,
-        debiased_estimation_loss: false,
-        scale_v_pred_loss_like_noise_pred: false,
-        masked_loss: false
-    },
-    quality: {
-        loss_type: 'l2',
-        huber_c: 0.1,
-        snr_gamma: 5,
-        snr_gamma_auto: true,
-        v_pred_like_loss: 0.1,
-        noise_offset_strength: 0.0357,
-        noise_offset_auto: true,
-        ip_noise_gamma: 0.05,
-        zero_terminal_snr: true,
-        debiased_estimation_loss: true,
-        scale_v_pred_loss_like_noise_pred: false,
-        masked_loss: false
-    },
-    dark_light: {
-        loss_type: 'l2',
-        huber_c: 0.1,
-        snr_gamma: 5,
-        snr_gamma_auto: true,
-        v_pred_like_loss: 0,
-        noise_offset_strength: 0.1,
-        noise_offset_auto: false,
-        ip_noise_gamma: 0,
-        zero_terminal_snr: true,
-        debiased_estimation_loss: false,
-        scale_v_pred_loss_like_noise_pred: false,
-        masked_loss: false
-    }
-};
+// LOSS_PRESETS is defined in const.js
 
 function applyLossPreset(presetName) {
     const preset = LOSS_PRESETS[presetName];
@@ -2931,3 +2780,321 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize localization
     Lang.load();
 });
+
+// --- DATASET SCANNING ---
+let arChart = null;
+let brightnessChart = null;
+
+function initDatasetCharts() {
+    const arCtx = document.getElementById('ar-chart');
+    const brCtx = document.getElementById('brightness-chart');
+    
+    if (arCtx && !arChart) {
+        arChart = new Chart(arCtx, {
+            type: 'bar',
+            data: {
+                labels: Array.from({length: 21}, (_, i) => (i - 10) / 10), // -1.0 to 1.0
+                datasets: [{
+                    label: 'Aspect Ratio Balance (Log2)',
+                    data: Array(21).fill(0),
+                    backgroundColor: 'rgba(205, 255, 0, 0.5)',
+                    borderColor: 'rgba(205, 255, 0, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true, grid: { color: '#333' } },
+                    x: { grid: { color: '#333' }, title: { display: true, text: 'Portrait < 0 > Landscape' } }
+                },
+                plugins: { legend: { display: false }, title: { display: true, text: 'Aspect Ratio Distribution (Log2)' } }
+            }
+        });
+    }
+    
+    if (brCtx && !brightnessChart) {
+        brightnessChart = new Chart(brCtx, {
+            type: 'bar',
+            data: {
+                labels: Array.from({length: 21}, (_, i) => (i - 10) / 10), // -1.0 to 1.0
+                datasets: [{
+                    label: 'Brightness Balance',
+                    data: Array(21).fill(0),
+                    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+                    borderColor: 'rgba(255, 255, 255, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true, grid: { color: '#333' } },
+                    x: { grid: { color: '#333' }, title: { display: true, text: 'Dark < 0 > Bright' } }
+                },
+                plugins: { legend: { display: false }, title: { display: true, text: 'Brightness Distribution' } }
+            }
+        });
+    }
+}
+
+async function scanDataset() {
+    const btn = document.querySelector('[onclick="scanDataset()"]');
+    if (btn) {
+        btn.disabled = true;
+        btn.classList.add('loading');
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE}/dataset/scan`);
+        if (!response.ok) throw new Error('Failed to scan dataset');
+        
+        const data = await response.json();
+        
+        document.getElementById('console-dataset-images').textContent = data.total_images;
+        document.getElementById('console-dataset-tags').textContent = data.total_tags;
+        document.getElementById('console-dataset-no-tags').textContent = data.no_tag_images;
+        
+        if (data.total_images > 0) {
+            const min = data.min_dim;
+            const max = data.max_dim;
+            document.getElementById('console-dataset-dims').textContent = `${min[0]}x${min[1]} - ${max[0]}x${max[1]}`;
+            
+            // Update Charts
+            initDatasetCharts();
+            if (arChart && data.ar_distribution) {
+                arChart.data.datasets[0].data = data.ar_distribution;
+                arChart.update();
+            }
+            if (brightnessChart && data.brightness_distribution) {
+                brightnessChart.data.datasets[0].data = data.brightness_distribution;
+                brightnessChart.update();
+            }
+            
+        } else {
+            document.getElementById('console-dataset-dims').textContent = '--';
+        }
+        
+        showNotification(Lang.get('ui.notifications.dataset_scan_success') || 'Dataset scan complete', 'success');
+    } catch (err) {
+        console.error(err);
+        showNotification(Lang.get('ui.notifications.dataset_scan_error') || 'Failed to scan dataset', 'error');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.classList.remove('loading');
+        }
+    }
+}
+
+// ============================================
+// AUGMENTATION PREVIEW GALLERY
+// ============================================
+
+let _augPreviewData = [];
+let _augPreviewPage = 1;
+let _augPreviewSessionId = null;
+let _augBlobUrls = new Map();  // Cache blob URLs to avoid re-fetching
+// AUG_PREVIEW_PER_PAGE is defined in const.js
+
+// Cleanup blob URLs when creating new preview
+function cleanupAugBlobUrls() {
+    for (const url of _augBlobUrls.values()) {
+        URL.revokeObjectURL(url);
+    }
+    _augBlobUrls.clear();
+}
+
+async function runAugmentationPreview() {
+    const btn = document.getElementById('btn-aug-preview');
+    const container = document.getElementById('aug-preview-container');
+    const gallery = document.getElementById('aug-preview-gallery');
+    
+    if (!btn || !container || !gallery) return;
+    
+    // Cleanup old blob URLs
+    cleanupAugBlobUrls();
+    
+    // Get form values for augmentation settings
+    const form = document.getElementById('training-form');
+    const resolution = parseInt(form.elements['resolution']?.value || '1024');
+    const datasetPath = form.elements['dataset_path']?.value || 'project/dataset';
+    
+    // Get individual augmentation values
+    const cropJitter = parseFloat(document.querySelector('[name="crop_jitter"]')?.value || '0');
+    const randomFlip = parseFloat(document.querySelector('[name="random_flip"]')?.value || '0');
+    const randomBrightness = parseFloat(document.querySelector('[name="random_brightness"]')?.value || '0');
+    const randomContrast = parseFloat(document.querySelector('[name="random_contrast"]')?.value || '0');
+    const randomSaturation = parseFloat(document.querySelector('[name="random_saturation"]')?.value || '0');
+    const randomHue = parseFloat(document.querySelector('[name="random_hue"]')?.value || '0');
+    
+    // Show loading state
+    btn.disabled = true;
+    btn.textContent = lang('ui.augmentation.btn_preview_loading');
+    container.style.display = 'block';
+    gallery.innerHTML = '<div class="aug-preview-loading">' + lang('ui.augmentation.btn_preview_loading') + '</div>';
+    
+    try {
+        const response = await fetch(`${API_BASE}/augmentation/preview`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                resolution: resolution,
+                dataset_path: datasetPath,
+                count: 100,
+                crop_jitter: cropJitter,
+                random_flip: randomFlip,
+                random_brightness: randomBrightness,
+                random_contrast: randomContrast,
+                random_saturation: randomSaturation,
+                random_hue: randomHue
+            })
+        });
+        
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.detail || 'Failed to generate preview');
+        }
+        
+        const data = await response.json();
+        
+        if (!data.images || data.images.length === 0) {
+            gallery.innerHTML = '<div class="aug-preview-empty">' + lang('ui.augmentation.preview_no_images') + '</div>';
+            return;
+        }
+        
+        _augPreviewData = data.images;
+        _augPreviewSessionId = data.session_id;
+        _augPreviewPage = 1;
+        
+        // Update count display
+        document.getElementById('aug-preview-count').textContent = data.count;
+        
+        renderAugPreviewGallery();
+        
+    } catch (err) {
+        console.error('Augmentation preview error:', err);
+        gallery.innerHTML = '<div class="aug-preview-empty">' + lang('ui.augmentation.preview_error') + ': ' + err.message + '</div>';
+    } finally {
+        btn.disabled = false;
+        btn.textContent = lang('ui.augmentation.btn_preview');
+    }
+}
+
+// Fetch image as blob and create object URL (with caching)
+async function getAugImageUrl(index, type) {
+    const cacheKey = `${_augPreviewSessionId}_${index}_${type}`;
+    
+    if (_augBlobUrls.has(cacheKey)) {
+        return _augBlobUrls.get(cacheKey);
+    }
+    
+    const response = await fetch(`${API_BASE}/augmentation/preview/${_augPreviewSessionId}/${index}/${type}`);
+    if (!response.ok) throw new Error('Failed to load image');
+    
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    _augBlobUrls.set(cacheKey, url);
+    
+    return url;
+}
+
+async function renderAugPreviewGallery() {
+    const gallery = document.getElementById('aug-preview-gallery');
+    if (!gallery || _augPreviewData.length === 0 || !_augPreviewSessionId) return;
+    
+    const totalPages = Math.ceil(_augPreviewData.length / AUG_PREVIEW_PER_PAGE);
+    const startIdx = (_augPreviewPage - 1) * AUG_PREVIEW_PER_PAGE;
+    const endIdx = Math.min(startIdx + AUG_PREVIEW_PER_PAGE, _augPreviewData.length);
+    const pageItems = _augPreviewData.slice(startIdx, endIdx);
+    
+    // Update pagination controls
+    document.getElementById('aug-current-page').textContent = _augPreviewPage;
+    document.getElementById('aug-total-pages').textContent = totalPages;
+    document.getElementById('aug-prev-page').disabled = _augPreviewPage <= 1;
+    document.getElementById('aug-next-page').disabled = _augPreviewPage >= totalPages;
+    
+    // Generate gallery HTML with placeholder images
+    gallery.innerHTML = pageItems.map(item => {
+        const tags = [];
+        // Show tags based on augmentations array from backend
+        for (const aug of item.augmentations) {
+            if (aug.startsWith('Crop')) {
+                tags.push(`<span class="aug-tag cropped">${aug}</span>`);
+            } else if (aug === 'Flip') {
+                tags.push(`<span class="aug-tag flipped">Flip</span>`);
+            } else if (aug === 'Brightness') {
+                tags.push(`<span class="aug-tag brightness">Brightness</span>`);
+            } else if (aug === 'Contrast') {
+                tags.push(`<span class="aug-tag contrast">Contrast</span>`);
+            } else if (aug === 'Saturation') {
+                tags.push(`<span class="aug-tag saturation">Saturation</span>`);
+            } else if (aug === 'Hue') {
+                tags.push(`<span class="aug-tag hue">Hue</span>`);
+            }
+        }
+        
+        return `
+            <div class="aug-preview-item">
+                <div class="aug-preview-images">
+                    <div class="aug-preview-img-wrapper">
+                        <img data-aug-id="${item.id}" data-aug-type="original" alt="Original" loading="lazy">
+                        <div class="aug-preview-img-label">${lang('ui.augmentation.preview_original')}</div>
+                    </div>
+                    <div class="aug-preview-img-wrapper">
+                        <img data-aug-id="${item.id}" data-aug-type="augmented" alt="Augmented" loading="lazy">
+                        <div class="aug-preview-img-label">${lang('ui.augmentation.preview_augmented')}</div>
+                    </div>
+                </div>
+                <div class="aug-preview-info-bar">
+                    <div class="aug-preview-filename" title="${item.filename}">${item.filename}</div>
+                    <div class="aug-preview-tags">
+                        ${tags.length > 0 ? tags.join('') : '<span style="color: var(--text-muted); font-size: 9px;">No augmentation</span>'}
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    // Load images via blob URLs
+    const images = gallery.querySelectorAll('img[data-aug-id]');
+    for (const img of images) {
+        const id = parseInt(img.dataset.augId);
+        const type = img.dataset.augType;
+        
+        try {
+            const url = await getAugImageUrl(id, type);
+            img.src = url;
+        } catch (err) {
+            console.error(`Failed to load aug image ${id}/${type}:`, err);
+            img.alt = 'Failed to load';
+        }
+    }
+}
+
+function augPreviewNextPage() {
+    const totalPages = Math.ceil(_augPreviewData.length / AUG_PREVIEW_PER_PAGE);
+    if (_augPreviewPage < totalPages) {
+        _augPreviewPage++;
+        renderAugPreviewGallery();
+        // Scroll gallery to top
+        const gallery = document.getElementById('aug-preview-gallery');
+        if (gallery) gallery.scrollTop = 0;
+    }
+}
+
+function augPreviewPrevPage() {
+    if (_augPreviewPage > 1) {
+        _augPreviewPage--;
+        renderAugPreviewGallery();
+        // Scroll gallery to top
+        const gallery = document.getElementById('aug-preview-gallery');
+        if (gallery) gallery.scrollTop = 0;
+    }
+}
+
+// Cleanup blob URLs when leaving augmentation tab or closing preview
+window.addEventListener('beforeunload', cleanupAugBlobUrls);
+

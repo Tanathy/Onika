@@ -3,6 +3,7 @@
     "ui": {
         "sidebar": {
             "training": "Training",
+            "augmentation": "Augmentation",
             "console": "Console",
             "metadata": "Metadata",
             "updates": "Updates",
@@ -51,7 +52,7 @@
                 "network": "Network",
                 "dataset": "Dataset",
                 "text_encoder": "Text Encoder",
-                "aug": "Augmentation & Caching",
+                "caching": "Caching",
                 "learning": "Learning",
                 "advanced": "Advanced",
                 "samples": "Samples",
@@ -228,25 +229,17 @@
                 "token_abs": "Token Abstraction",
                 "token_abs_help": "The placeholder string (e.g., \"TOK\") used to represent the new concept in captions."
             },
-            "aug": {
-                "aug_title": "Image Augmentation",
-                "aug_mode": "Augmentation Mode",
-                "aug_mode_help": "Decides when augmentations kick in during training. <strong>Always:</strong> Every image gets augmented on every step — maximum variety, though it can slow things down a bit. <strong>Per Epoch Only:</strong> New augmentations are rolled once per epoch and stay consistent within that pass. Keeps things stable while still mixing it up between epochs. <strong>Random Probability:</strong> Each image might or might not get augmented on any given step, based on individual settings like <a href=\"#\" class=\"xref-link\" data-xref=\"flip_aug_probability\" data-xref-label=\"Flip Aug Probability\" data-xref-tab=\"training\" data-xref-subtab=\"cfg-aug\">Flip Aug Probability</a>. Most of the time, \"Always\" or \"Per Epoch Only\" will do the trick.",
-                "color_aug": "Color Aug Strength",
-                "color_aug_help": "How aggressively to jitter colors (hue, saturation, brightness) during training. <strong>0.0:</strong> Colors stay exactly as-is — no tampering. <strong>0.3-0.5:</strong> Gentle variation, works great for most datasets and helps the model not memorize exact colors. <strong>0.7-1.0:</strong> Heavy color shifts. Can produce weird combos but really pushes generalization. This is especially handy for character or style LoRAs where you want the model to nail shapes and concepts without getting stuck on particular palettes. Turn it off if color fidelity matters (brand colors, specific outfits, etc.).",
-                "flip_aug": "Flip Aug Probability",
-                "flip_aug_help": "Chance of flipping each image horizontally. <strong>0.5</strong> = 50/50 coin flip, essentially doubling your dataset with mirrored versions. <strong>0.0</strong> = no flipping whatsoever. <strong>Heads up:</strong> Set this to 0 if your images have: • <strong>Text or logos</strong> (would be backwards) • <strong>Asymmetric stuff</strong> (cars, faces with a distinctive side) • <strong>Directional content</strong> (left vs right hands, specific poses) Works great for symmetric subjects like centered portraits, abstract art, or many anime characters. One of the best tricks against overfitting on small datasets.",
-                "crop_scale": "Random Crop Scale",
-                "crop_scale_help": "Minimum zoom level for random cropping. <strong>1.0:</strong> No cropping — images stay at full size. <strong>0.8:</strong> Crops anywhere between 80-100%, giving subtle zoom variations. <strong>0.5:</strong> More dramatic — can zoom in up to 2×, showing the model wildly different framings. Cropping teaches the model to handle subjects at various scales and compositions. Super useful if your dataset is all \"perfectly centered headshots\" but you want more flexibility in outputs. Keep at 1.0 if exact framing matters.",
-                "caption_aug_title": "Caption Augmentation",
-                "shuffle": "Shuffle Captions",
-                "shuffle_help": "Randomizes the order of tags/words in captions each time they're used. Stops the model from memorizing fixed patterns like \"blue eyes always comes before long hair\" — instead, it learns that these tags can appear anywhere. Perfect for booru-style comma-separated tags where order is meaningless. Use <a href=\"#\" class=\"xref-link\" data-xref=\"keep_tokens\" data-xref-label=\"Keep Tokens\" data-xref-tab=\"training\" data-xref-subtab=\"cfg-aug\">Keep Tokens</a> if you need the trigger word to stay put. <strong>Don't use this</strong> for natural language captions where word order carries meaning (\"woman holding cat\" ≠ \"cat holding woman\").",
-                "keep_tokens": "Keep Tokens",
-                "keep_tokens_help": "How many tokens at the start of each caption are \"sacred\" and won't get shuffled. <strong>0:</strong> Everything's fair game for shuffling. <strong>1:</strong> First token (usually your trigger word) always stays first. <strong>2-3:</strong> Protects \"trigger, character_name\" style patterns. If your captions look like \"mytrigger, blonde hair, blue eyes, ...\", setting this to 1 keeps \"mytrigger\" anchored at the front while the rest gets randomized. Helps the model lock onto the trigger-concept association without memorizing exact tag orders. Only matters when <a href=\"#\" class=\"xref-link\" data-xref=\"shuffle_caption_checkbox\" data-xref-label=\"Shuffle Captions\" data-xref-tab=\"training\" data-xref-subtab=\"cfg-aug\">Shuffle Captions</a> is enabled.",
-                "dropout": "Dropout Rate",
-                "dropout_help": "Probability of completely dropping an image's caption (replacing it with nothing). When captions vanish, the model has to figure out the image purely from visuals — this trains unconditional generation. <strong>0.0:</strong> Captions always present. <strong>0.05-0.1:</strong> Light dropout, gently improves what happens when users give empty or weak prompts. <strong>0.15-0.2:</strong> More aggressive — really pushes unconditional quality. Dropout helps CFG (classifier-free guidance) work better at inference time, since the model actually knows what \"no prompt\" looks like. But for LoRA training where prompt adherence is king, too much dropout can backfire. A tiny bit (0.05) often helps; skip it entirely for very short training runs.",
-                "dropout_epochs": "Dropout Every N Epochs",
-                "dropout_epochs_help": "Instead of random dropout per step, this drops captions on specific epochs. <strong>0:</strong> Falls back to the normal random <a href=\"#\" class=\"xref-link\" data-xref=\"caption_dropout_rate\" data-xref-label=\"Dropout Rate\" data-xref-tab=\"training\" data-xref-subtab=\"cfg-aug\">Dropout Rate</a> behavior. <strong>1:</strong> Every single epoch is captionless (pretty extreme). <strong>5:</strong> Epochs 5, 10, 15... go without captions. This gives you a more structured pattern — normal training most of the time, with periodic \"blind\" epochs. Useful for specific curricula, but random per-step dropout is more common in practice.",
+            "caching": {
+                "caching_title": "Caching",
+                "cache_latents": "Cache Latents to RAM",
+                "cache_latents_help": "Precomputes VAE latents to significantly increase training speed (often 2x-3x). When enabled, all latents are cached and remain in RAM throughout training. This disables certain real-time augmentations.",
+                "cache_te": "Cache Text Embeddings",
+                "cache_te_help": "Precomputes text embeddings to improve training speed. This setting is incompatible with active Text Encoder training.",
+                "cache_disk": "Cache Latents to Disk",
+                "cache_disk_help": "Saves precomputed latents to disk to conserve RAM. Note that slow disk I/O can negatively impact training performance. These latents will be reused in training sessions. If dataset changes, you have to delete the old latents manually from cache.",
+                "vae_batch": "VAE Batch Size",
+                "vae_batch_help": "The batch size used for VAE encoding during the caching process. Higher values increase speed but require more VRAM.",
+                "vae_batch_placeholder": "Auto",
                 "noise_title": "Noise Settings",
                 "noise_type": "Noise Offset Type",
                 "noise_type_help": "The mathematical method used to calculate noise offset. \"Original\" is the standard implementation.",
@@ -261,17 +254,7 @@
                 "multires_discount": "Multires Noise Discount",
                 "multires_discount_help": "The discount factor applied to multi-resolution noise iterations.",
                 "edm": "EDM-Style Training (SDXL)",
-                "edm_help": "Uses the EDM (Elucidating the Design Space of Diffusion-Based Generative Models) formulation, which can result in higher quality outputs for SDXL models.",
-                "caching_title": "Caching",
-                "cache_latents": "Cache Latents to RAM",
-                "cache_latents_help": "Precomputes VAE latents to significantly increase training speed (often 2x-3x). When enabled, all latents are cached and remain in RAM throughout training. This disables certain real-time augmentations.",
-                "cache_te": "Cache Text Embeddings",
-                "cache_te_help": "Precomputes text embeddings to improve training speed. This setting is incompatible with active Text Encoder training.",
-                "cache_disk": "Cache Latents to Disk",
-                "cache_disk_help": "Saves precomputed latents to disk to conserve RAM. Note that slow disk I/O can negatively impact training performance. These latents will be reused in training sessions. If dataset changes, you have to delete the old latents manually from cache.",
-                "vae_batch": "VAE Batch Size",
-                "vae_batch_help": "The batch size used for VAE encoding during the caching process. Higher values increase speed but require more VRAM.",
-                "vae_batch_placeholder": "Auto"
+                "edm_help": "Uses the EDM (Elucidating the Design Space of Diffusion-Based Generative Models) formulation, which can result in higher quality outputs for SDXL models."
             },
             "learning": {
                 "optimizer": "Optimizer",
@@ -381,7 +364,68 @@
                 "preset_default": "Default",
                 "preset_balanced": "Balanced",
                 "preset_quality": "Quality",
-                "preset_dark_light": "Dark/Light"
+                "preset_dark_light": "Dark/Light",
+                "loss_type": {
+                    "label": "Loss Type",
+                    "help": "Determines how the error between the generated image and the target is calculated. 'L2' (MSE) is the standard, penalizing large errors heavily for smooth convergence. 'Huber' is a hybrid that is less sensitive to outliers, while 'L1' (MAE) can provide sharper results but may be less stable. L2 is recommended for most training scenarios.",
+                    "options": {
+                        "l2": "L2 (MSE)",
+                        "huber": "Huber",
+                        "smooth_l1": "Smooth L1",
+                        "l1": "L1 (MAE)"
+                    }
+                },
+                "debiased_estimation_loss": {
+                    "label": "Debiased Estimation Loss",
+                    "help": "Corrects for the bias introduced by the Min-SNR weighting strategy, keeping the training mathematically grounded. Note that this can slightly affect convergence speed or the effective learning rate balance."
+                },
+                "min_snr_gamma": {
+                    "label": "Min SNR Gamma",
+                    "help": "Balances training focus across different noise levels. This is essential for zero-terminal-SNR models like SDXL to learn structural details. A value of 5.0 is recommended for SDXL; setting this to 0 on v-prediction models may result in noisy or broken images."
+                },
+                "snr_gamma": {
+                    "label": "SNR Gamma (Alias)",
+                    "help": "Alternative name for Min SNR Gamma used by some legacy scripts. Same effect as above."
+                },
+                "prior_loss_weight": {
+                    "label": "Prior Loss Weight",
+                    "help": "Controls the relative importance of regularization images versus training images. Higher values (e.g., 1.0) strongly preserve the original class (e.g., 'person'), while lower values allow the model to drift more towards the target style. Setting this too low can lead to catastrophic forgetting of the base concept."
+                },
+                "scheduled_huber_schedule": {
+                    "label": "Scheduled Huber Schedule",
+                    "help": "Defines how the Huber loss threshold evolves over time, allowing for a transition between robust and precise loss calculations. 'Constant' is the most stable option.",
+                    "options": {
+                        "constant": "Constant",
+                        "exponential": "Exponential",
+                        "snr": "SNR-based"
+                    }
+                },
+                "scheduled_huber_c": {
+                    "label": "Scheduled Huber C",
+                    "help": "The threshold where Huber loss transitions from quadratic (L2) to linear (L1), controlling sensitivity to outliers. Lower values increase robustness, while higher values behave more like standard L2 loss."
+                },
+                "scheduled_huber_scale": {
+                    "label": "Scheduled Huber Scale",
+                    "help": "Global multiplier for the Huber loss. Used to balance the loss magnitude against other loss components."
+                },
+                "scale_weight_norms": {
+                    "label": "Scale Weight Norms",
+                    "help": "Rescales network weights to maintain them within a specific range, which can prevent exploding gradients in deep networks or when using high learning rates. This is typically not required for standard LoRA training."
+                }
+            },
+            "optim": {
+                "gradient_checkpointing": {
+                    "label": "Gradient Checkpointing",
+                    "help": "Reduces VRAM usage by re-calculating parts of the model during the backward pass instead of storing them in memory. This enables larger batch sizes at the cost of a 20-30% reduction in training speed."
+                },
+                "max_grad_norm": {
+                    "label": "Max Grad Norm",
+                    "help": "Clips gradient spikes to a specified value to prevent 'exploding gradients,' which can cause the model to produce NaN or black images. A value of 1.0 is the industry standard."
+                },
+                "no_half_vae": {
+                    "label": "No Half VAE",
+                    "help": "Forces the VAE to operate in float32 precision to prevent NaN errors (black squares), which are common with the SDXL VAE in lower precision. This improves stability but increases VRAM consumption."
+                }
             },
             "samples": {
                 "prompts_title": "Sample Prompts",
@@ -456,6 +500,49 @@
                 "success": "Conversion Successful!"
             }
         },
+        "augmentation": {
+            "title": "Augmentation",
+            "subtitle": "Preview and configure image augmentation settings",
+            "tabs": {
+                "preview": "Preview",
+                "settings": "Settings"
+            },
+            "btn_preview": "Generate Preview",
+            "btn_preview_loading": "Processing...",
+            "preview_page": "Page",
+            "preview_of": "of",
+            "preview_images": "images",
+            "preview_original": "Original",
+            "preview_augmented": "Augmented",
+            "preview_no_images": "No images found in dataset",
+            "preview_error": "Failed to generate preview",
+            "label_flipped": "Flipped",
+            "label_cropped": "Cropped",
+            "label_color_aug": "Color Aug",
+            "settings": {
+                "crop_jitter": "Crop Jitter",
+                "crop_jitter_help": "Randomly crops the image by this amount. <strong>0.0:</strong> No cropping. <strong>0.1:</strong> Randomly crops between 90-100% of the image size.",
+                "random_flip": "Random Flip",
+                "random_flip_help": "Chance of flipping each image horizontally. <strong>0.5:</strong> 50/50 coin flip. <strong>0.0:</strong> No flipping.",
+                "random_brightness": "Random Brightness",
+                "random_brightness_help": "Randomly adjusts image brightness. <strong>0.0:</strong> No change. <strong>0.1:</strong> +/- 10% variation.",
+                "random_contrast": "Random Contrast",
+                "random_contrast_help": "Randomly adjusts image contrast. <strong>0.0:</strong> No change. <strong>0.1:</strong> +/- 10% variation.",
+                "random_saturation": "Random Saturation",
+                "random_saturation_help": "Randomly adjusts image saturation. <strong>0.0:</strong> No change. <strong>0.1:</strong> +/- 10% variation.",
+                "random_hue": "Random Hue",
+                "random_hue_help": "Randomly shifts image hue. <strong>0.0:</strong> No change. <strong>0.1:</strong> Significant color shift.",
+                "caption_aug_title": "Caption Augmentation",
+                "shuffle": "Shuffle Captions",
+                "shuffle_help": "Randomizes the order of tags/words in captions each time they're used. Perfect for booru-style comma-separated tags where order is meaningless.",
+                "keep_tokens": "Keep Tokens",
+                "keep_tokens_help": "How many tokens at the start of each caption are \"sacred\" and won't get shuffled. <strong>1:</strong> First token (usually trigger word) always stays first.",
+                "dropout": "Dropout Rate",
+                "dropout_help": "Probability of completely dropping an image's caption. <strong>0.0:</strong> Captions always present. <strong>0.05-0.1:</strong> Light dropout.",
+                "dropout_epochs": "Dropout Every N Epochs",
+                "dropout_epochs_help": "Instead of random dropout per step, this drops captions on specific epochs. <strong>0:</strong> Falls back to normal random dropout behavior."
+            }
+        },
         "console": {
             "title": "System Console",
             "subtitle": "Real-time training logs and system output",
@@ -469,7 +556,12 @@
             "gpu_load": "GPU Load",
             "cpu_load": "CPU Load",
             "ram": "RAM",
-            "waiting": "Waiting for training to start..."
+            "waiting": "Waiting for training to start...",
+            "dataset_images": "Images",
+            "dataset_tags": "Total Tags",
+            "dataset_no_tags": "No Tags",
+            "dataset_dims": "Dimensions (Min-Max)",
+            "btn_scan_dataset": "Scan Dataset"
         },
         "metadata_editor": {
             "title": "Metadata Editor",
@@ -543,7 +635,9 @@
             "conversion_success": "Conversion successful!",
             "conversion_failed": "Conversion failed: {error}",
             "conversion_error": "Conversion error: {error}",
-            "output_load_failed": "Failed to load output files: {error}"
+            "output_load_failed": "Failed to load output files: {error}",
+            "dataset_scan_success": "Dataset scan complete!",
+            "dataset_scan_error": "Failed to scan dataset."
         },
         "common": {
             "app_title": "Onika Trainer",

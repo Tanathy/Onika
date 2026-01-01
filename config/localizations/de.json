@@ -3,6 +3,7 @@
     "ui": {
         "sidebar": {
             "training": "Training",
+            "augmentation": "Augmentierung",
             "console": "Konsole",
             "metadata": "Metadaten",
             "updates": "Updates",
@@ -51,7 +52,7 @@
                 "network": "Netzwerk",
                 "dataset": "Datensatz",
                 "text_encoder": "Text-Encoder",
-                "aug": "Augmentierung & Caching",
+                "caching": "Caching",
                 "learning": "Lernen",
                 "advanced": "Erweitert",
                 "samples": "Samples",
@@ -228,25 +229,17 @@
                 "token_abs": "Token-Abstraktion",
                 "token_abs_help": "Der Platzhalter-String (z.B. \"TOK\"), der verwendet wird, um das neue Konzept in Captions darzustellen."
             },
-            "aug": {
-                "aug_title": "Bildaugmentierung",
-                "aug_mode": "Augmentierungsmodus",
-                "aug_mode_help": "Entscheidet, wann Augmentierungen während des Trainings einsetzen. <strong>Immer:</strong> Jedes Bild wird bei jedem Schritt augmentiert — maximale Vielfalt, kann aber etwas verlangsamen. <strong>Nur pro Epoche:</strong> Neue Augmentierungen werden einmal pro Epoche gewürfelt und bleiben in diesem Durchgang konsistent. Hält die Dinge stabil, während es zwischen Epochen variiert. <strong>Zufällige Wahrscheinlichkeit:</strong> Jedes Bild kann bei jedem Schritt augmentiert werden oder nicht, basierend auf individuellen Einstellungen wie <a href=\"#\" class=\"xref-link\" data-xref=\"flip_aug_probability\" data-xref-label=\"Flip Aug Probability\" data-xref-tab=\"training\" data-xref-subtab=\"cfg-aug\">Flip Aug Probability</a>. Meistens funktionieren \"Immer\" oder \"Nur pro Epoche\" gut.",
-                "color_aug": "Farbaugmentierungsstärke",
-                "color_aug_help": "Wie aggressiv Farben (Farbton, Sättigung, Helligkeit) während des Trainings variiert werden. <strong>0.0:</strong> Farben bleiben genau wie sie sind — keine Manipulation. <strong>0.3-0.5:</strong> Sanfte Variation, funktioniert super für die meisten Datensätze und hilft dem Modell, exakte Farben nicht auswendig zu lernen. <strong>0.7-1.0:</strong> Starke Farbverschiebungen. Kann seltsame Kombinationen erzeugen, pusht aber wirklich die Generalisierung. Besonders praktisch für Charakter- oder Stil-LoRAs, wo du willst, dass das Modell Formen und Konzepte beherrscht, ohne an bestimmten Paletten hängenzubleiben. Abschalten, wenn Farbtreue wichtig ist (Markenfarben, spezifische Outfits usw.).",
-                "flip_aug": "Flip-Aug-Wahrscheinlichkeit",
-                "flip_aug_help": "Chance, jedes Bild horizontal zu spiegeln. <strong>0.5</strong> = 50/50 Münzwurf, verdoppelt im Wesentlichen deinen Datensatz mit gespiegelten Versionen. <strong>0.0</strong> = überhaupt keine Spiegelung. <strong>Achtung:</strong> Setze dies auf 0, wenn deine Bilder haben: • <strong>Text oder Logos</strong> (wären rückwärts) • <strong>Asymmetrische Sachen</strong> (Autos, Gesichter mit einer markanten Seite) • <strong>Richtungsbezogene Inhalte</strong> (linke vs. rechte Hände, spezifische Posen). Funktioniert super für symmetrische Subjekte wie zentrierte Porträts, abstrakte Kunst oder viele Anime-Charaktere. Einer der besten Tricks gegen Overfitting bei kleinen Datensätzen.",
-                "crop_scale": "Zufällige Crop-Skala",
-                "crop_scale_help": "Minimales Zoom-Level für zufälliges Zuschneiden. <strong>1.0:</strong> Kein Zuschneiden — Bilder bleiben in voller Größe. <strong>0.8:</strong> Schneidet irgendwo zwischen 80-100% zu, gibt subtile Zoom-Variationen. <strong>0.5:</strong> Dramatischer — kann bis zu 2× hineinzoomen und dem Modell völlig unterschiedliche Bildausschnitte zeigen. Zuschneiden lehrt das Modell, Subjekte in verschiedenen Maßstäben und Kompositionen zu handhaben. Super nützlich, wenn dein Datensatz nur \"perfekt zentrierte Kopfschüsse\" hat, du aber mehr Flexibilität in Ausgaben willst. Bei 1.0 lassen, wenn exakte Bildausschnitte wichtig sind.",
-                "caption_aug_title": "Caption-Augmentierung",
-                "shuffle": "Captions mischen",
-                "shuffle_help": "Randomisiert die Reihenfolge von Tags/Wörtern in Captions jedes Mal, wenn sie verwendet werden. Hindert das Modell daran, feste Muster wie \"blaue Augen kommen immer vor langen Haaren\" auswendig zu lernen — stattdessen lernt es, dass diese Tags überall erscheinen können. Perfekt für Booru-Stil kommagetrennten Tags, wo die Reihenfolge bedeutungslos ist. Verwende <a href=\"#\" class=\"xref-link\" data-xref=\"keep_tokens\" data-xref-label=\"Keep Tokens\" data-xref-tab=\"training\" data-xref-subtab=\"cfg-aug\">Keep Tokens</a>, wenn du das Triggerwort festhalten musst. <strong>Nicht verwenden</strong> für natürlichsprachliche Captions, wo Wortreihenfolge Bedeutung trägt (\"Frau hält Katze\" ≠ \"Katze hält Frau\").",
-                "keep_tokens": "Tokens behalten",
-                "keep_tokens_help": "Wie viele Tokens am Anfang jeder Caption \"heilig\" sind und nicht gemischt werden. <strong>0:</strong> Alles ist zum Mischen freigegeben. <strong>1:</strong> Erstes Token (normalerweise dein Triggerwort) bleibt immer zuerst. <strong>2-3:</strong> Schützt \"Trigger, Charaktername\"-Stil-Muster. Wenn deine Captions aussehen wie \"mytrigger, blonde Haare, blaue Augen, ...\", hält das Setzen auf 1 \"mytrigger\" vorne verankert, während der Rest randomisiert wird. Hilft dem Modell, sich auf die Trigger-Konzept-Assoziation zu fixieren, ohne exakte Tag-Reihenfolen auswendig zu lernen. Relevant nur, wenn <a href=\"#\" class=\"xref-link\" data-xref=\"shuffle_caption_checkbox\" data-xref-label=\"Shuffle Captions\" data-xref-tab=\"training\" data-xref-subtab=\"cfg-aug\">Shuffle Captions</a> aktiviert ist.",
-                "dropout": "Dropout-Rate",
-                "dropout_help": "Wahrscheinlichkeit, die Caption eines Bildes vollständig zu löschen (durch nichts ersetzen). Wenn Captions verschwinden, muss das Modell das Bild rein aus Visuellem herausfinden — dies trainiert bedingungslose Generierung. <strong>0.0:</strong> Captions immer vorhanden. <strong>0.05-0.1:</strong> Leichter Dropout, verbessert sanft, was passiert, wenn Benutzer leere oder schwache Prompts geben. <strong>0.15-0.2:</strong> Aggressiver — pusht wirklich die bedingungslose Qualität. Dropout hilft CFG (Classifier-Free Guidance) zur Inferenzzeit besser zu funktionieren, da das Modell tatsächlich weiß, wie \"kein Prompt\" aussieht. Aber für LoRA-Training, wo Prompt-Treue König ist, kann zu viel Dropout nach hinten losgehen. Ein kleines bisschen (0.05) hilft oft; komplett überspringen für sehr kurze Trainingsläufe.",
-                "dropout_epochs": "Dropout alle N Epochen",
-                "dropout_epochs_help": "Statt zufälligen Dropouts pro Schritt, löscht dies Captions bei spezifischen Epochen. <strong>0:</strong> Fällt zurück auf das normale zufällige <a href=\"#\" class=\"xref-link\" data-xref=\"caption_dropout_rate\" data-xref-label=\"Dropout Rate\" data-xref-tab=\"training\" data-xref-subtab=\"cfg-aug\">Dropout Rate</a>-Verhalten. <strong>1:</strong> Jede einzelne Epoche ist ohne Captions (ziemlich extrem). <strong>5:</strong> Epochen 5, 10, 15... laufen ohne Captions. Das gibt dir ein strukturierteres Muster — normales Training die meiste Zeit, mit periodischen \"blinden\" Epochen. Nützlich für spezifische Curricula, aber zufälliger Dropout pro Schritt ist in der Praxis häufiger.",
+            "caching": {
+                "caching_title": "Caching",
+                "cache_latents": "Latents in RAM cachen",
+                "cache_latents_help": "Vorberechnet VAE-Latents, um die Trainingsgeschwindigkeit signifikant zu erhöhen (oft 2x-3x). Wenn aktiviert, werden alle Latents gecacht und bleiben während des gesamten Trainings im RAM. Dies deaktiviert bestimmte Echtzeit-Augmentierungen.",
+                "cache_te": "Text-Embeddings cachen",
+                "cache_te_help": "Vorberechnet Text-Embeddings zur Verbesserung der Trainingsgeschwindigkeit. Diese Einstellung ist inkompatibel mit aktivem Text-Encoder-Training.",
+                "cache_disk": "Latents auf Disk cachen",
+                "cache_disk_help": "Speichert vorberechnete Latents auf der Festplatte, um RAM zu sparen. Beachte, dass langsame Disk-I/O die Trainingsleistung negativ beeinflussen kann. Diese Latents werden in Trainingssessions wiederverwendet. Wenn sich der Datensatz ändert, musst du die alten Latents manuell aus dem Cache löschen.",
+                "vae_batch": "VAE-Batch-Größe",
+                "vae_batch_help": "Die Batch-Größe für VAE-Encoding während des Caching-Prozesses. Höhere Werte erhöhen die Geschwindigkeit, benötigen aber mehr VRAM.",
+                "vae_batch_placeholder": "Auto",
                 "noise_title": "Rausch-Einstellungen",
                 "noise_type": "Noise-Offset-Typ",
                 "noise_type_help": "Die mathematische Methode zur Berechnung des Noise-Offsets. \"Original\" ist die Standardimplementierung.",
@@ -261,17 +254,7 @@
                 "multires_discount": "Multires-Noise-Discount",
                 "multires_discount_help": "Der Diskontfaktor, der auf Multi-Resolution-Noise-Iterationen angewendet wird.",
                 "edm": "EDM-Stil-Training (SDXL)",
-                "edm_help": "Verwendet die EDM-Formulierung (Elucidating the Design Space of Diffusion-Based Generative Models), was zu höherer Qualität für SDXL-Modelle führen kann.",
-                "caching_title": "Caching",
-                "cache_latents": "Latents in RAM cachen",
-                "cache_latents_help": "Vorberechnet VAE-Latents, um die Trainingsgeschwindigkeit signifikant zu erhöhen (oft 2x-3x). Wenn aktiviert, werden alle Latents gecacht und bleiben während des gesamten Trainings im RAM. Dies deaktiviert bestimmte Echtzeit-Augmentierungen.",
-                "cache_te": "Text-Embeddings cachen",
-                "cache_te_help": "Vorberechnet Text-Embeddings zur Verbesserung der Trainingsgeschwindigkeit. Diese Einstellung ist inkompatibel mit aktivem Text-Encoder-Training.",
-                "cache_disk": "Latents auf Disk cachen",
-                "cache_disk_help": "Speichert vorberechnete Latents auf der Festplatte, um RAM zu sparen. Beachte, dass langsame Disk-I/O die Trainingsleistung negativ beeinflussen kann. Diese Latents werden in Trainingssessions wiederverwendet. Wenn sich der Datensatz ändert, musst du die alten Latents manuell aus dem Cache löschen.",
-                "vae_batch": "VAE-Batch-Größe",
-                "vae_batch_help": "Die Batch-Größe für VAE-Encoding während des Caching-Prozesses. Höhere Werte erhöhen die Geschwindigkeit, benötigen aber mehr VRAM.",
-                "vae_batch_placeholder": "Auto"
+                "edm_help": "Verwendet die EDM-Formulierung (Elucidating the Design Space of Diffusion-Based Generative Models), was zu höherer Qualität für SDXL-Modelle führen kann."
             },
             "learning": {
                 "optimizer": "Optimizer",
@@ -381,7 +364,68 @@
                 "preset_default": "Standard",
                 "preset_balanced": "Ausgewogen",
                 "preset_quality": "Qualität",
-                "preset_dark_light": "Dunkel/Hell"
+                "preset_dark_light": "Dunkel/Hell",
+                "loss_type": {
+                    "label": "Loss-Typ",
+                    "help": "Die mathematische Funktion zur Fehlerberechnung.",
+                    "options": {
+                        "l2": "L2 (MSE)",
+                        "huber": "Huber",
+                        "smooth_l1": "Smooth L1",
+                        "l1": "L1 (MAE)"
+                    }
+                },
+                "debiased_estimation_loss": {
+                    "label": "Debiased Estimation Loss",
+                    "help": "Gleicht die Loss-Berechnung über die Zeitschritte aus."
+                },
+                "min_snr_gamma": {
+                    "label": "Min-SNR Gamma",
+                    "help": "Gewichtung basierend auf Rauschpegeln für stabileres Training."
+                },
+                "snr_gamma": {
+                    "label": "SNR Gamma",
+                    "help": "Alternative Gamma-Gewichtung."
+                },
+                "prior_loss_weight": {
+                    "label": "Prior Loss Gewichtung",
+                    "help": "Gewichtung des Fehlers bei Regularisierungsbildern."
+                },
+                "scheduled_huber_schedule": {
+                    "label": "Scheduled Huber Zeitplan",
+                    "help": "Strategie zur Anpassung des Huber-Schwellenwerts.",
+                    "options": {
+                        "constant": "Konstant",
+                        "exponential": "Exponentiell",
+                        "snr": "SNR-basiert"
+                    }
+                },
+                "scheduled_huber_c": {
+                    "label": "Scheduled Huber C",
+                    "help": "Basis-Schwellenwert für Huber-Loss."
+                },
+                "scheduled_huber_scale": {
+                    "label": "Scheduled Huber Skala",
+                    "help": "Skalierungsfaktor für den Huber-Zeitplan."
+                },
+                "scale_weight_norms": {
+                    "label": "Gewichtsnormen skalieren",
+                    "help": "Skaliert Gewichte basierend auf ihrer Norm."
+                }
+            },
+            "optim": {
+                "gradient_checkpointing": {
+                    "label": "Gradient Checkpointing",
+                    "help": "Spart VRAM durch Neuberechnung. Langsamer, aber speicherschonend."
+                },
+                "max_grad_norm": {
+                    "label": "Max Grad Norm",
+                    "help": "Gradienten-Clipping für mehr Stabilität."
+                },
+                "no_half_vae": {
+                    "label": "Kein Half VAE",
+                    "help": "Zwingt VAE in float32, um NaN-Fehler zu vermeiden."
+                }
             },
             "samples": {
                 "prompts_title": "Beispiel-Prompts",
@@ -456,6 +500,49 @@
                 "success": "Konvertierung erfolgreich!"
             }
         },
+        "augmentation": {
+            "title": "Augmentierung",
+            "subtitle": "Vorschau und Konfiguration der Bildaugmentierung",
+            "btn_preview": "Vorschau generieren",
+            "btn_preview_loading": "Verarbeitung...",
+            "preview_page": "Seite",
+            "preview_of": "von",
+            "preview_images": "Bildern",
+            "preview_original": "Original",
+            "preview_augmented": "Augmentiert",
+            "preview_no_images": "Keine Bilder im Datensatz gefunden",
+            "preview_error": "Vorschau konnte nicht generiert werden",
+            "label_flipped": "Gespiegelt",
+            "label_cropped": "Zugeschnitten",
+            "label_color_aug": "Farb-Aug",
+            "tabs": {
+                "preview": "Vorschau",
+                "settings": "Einstellungen"
+            },
+            "settings": {
+                "crop_jitter": "Zuschnitt-Variation",
+                "crop_jitter_help": "Schneidet das Bild zufällig zu. <strong>0.0:</strong> Kein Zuschnitt. <strong>0.1:</strong> Zufälliger Zuschnitt zwischen 90-100% der Bildgröße.",
+                "random_flip": "Zufälliges Spiegeln",
+                "random_flip_help": "Wahrscheinlichkeit, das Bild horizontal zu spiegeln. <strong>0.5:</strong> 50/50 Chance. <strong>0.0:</strong> Kein Spiegeln.",
+                "random_brightness": "Zufällige Helligkeit",
+                "random_brightness_help": "Ändert zufällig die Helligkeit. <strong>0.0:</strong> Keine Änderung. <strong>0.1:</strong> +/- 10% Variation.",
+                "random_contrast": "Zufälliger Kontrast",
+                "random_contrast_help": "Ändert zufällig den Kontrast. <strong>0.0:</strong> Keine Änderung. <strong>0.1:</strong> +/- 10% Variation.",
+                "random_saturation": "Zufällige Sättigung",
+                "random_saturation_help": "Ändert zufällig die Sättigung. <strong>0.0:</strong> Keine Änderung. <strong>0.1:</strong> +/- 10% Variation.",
+                "random_hue": "Zufälliger Farbton",
+                "random_hue_help": "Verschiebt zufällig den Farbton. <strong>0.0:</strong> Keine Änderung. <strong>0.1:</strong> Deutliche Farbverschiebung.",
+                "caption_aug_title": "Beschriftungs-Augmentierung",
+                "shuffle": "Beschriftungen mischen",
+                "shuffle_help": "Randomisiert die Reihenfolge von Tags/Wörtern in Beschriftungen bei jeder Verwendung. Perfekt für booru-artige kommagetrennte Tags, bei denen die Reihenfolge irrelevant ist.",
+                "keep_tokens": "Tokens beibehalten",
+                "keep_tokens_help": "Wie viele Tokens am Anfang jeder Beschriftung \"heilig\" sind und nicht gemischt werden. <strong>1:</strong> Erstes Token (meist Trigger-Wort) bleibt immer vorne.",
+                "dropout": "Dropout-Rate",
+                "dropout_help": "Wahrscheinlichkeit, dass eine Bildbeschriftung komplett entfernt wird. <strong>0.0:</strong> Beschriftungen immer vorhanden. <strong>0.05-0.1:</strong> Leichtes Dropout.",
+                "dropout_epochs": "Dropout alle N Epochen",
+                "dropout_epochs_help": "Statt zufälligem Dropout pro Schritt werden Beschriftungen bei bestimmten Epochen entfernt. <strong>0:</strong> Fällt auf normales zufälliges Dropout-Verhalten zurück."
+            }
+        },
         "console": {
             "title": "Systemkonsole",
             "subtitle": "Echtzeit-Trainingslogs und Systemausgabe",
@@ -469,7 +556,12 @@
             "gpu_load": "GPU-Last",
             "cpu_load": "CPU-Last",
             "ram": "RAM",
-            "waiting": "Warte auf Trainingsstart..."
+            "waiting": "Warte auf Trainingsstart...",
+            "dataset_images": "Bilder",
+            "dataset_tags": "Tags gesamt",
+            "dataset_no_tags": "Keine Tags",
+            "dataset_dims": "Dimensionen (Min-Max)",
+            "btn_scan_dataset": "Datensatz scannen"
         },
         "metadata_editor": {
             "title": "Metadaten-Editor",
@@ -543,7 +635,9 @@
             "conversion_success": "Konvertierung erfolgreich!",
             "conversion_failed": "Konvertierung fehlgeschlagen: {error}",
             "conversion_error": "Konvertierungsfehler: {error}",
-            "output_load_failed": "Ausgabedateien konnten nicht geladen werden: {error}"
+            "output_load_failed": "Ausgabedateien konnten nicht geladen werden: {error}",
+            "dataset_scan_success": "Datensatz-Scan abgeschlossen!",
+            "dataset_scan_error": "Datensatz-Scan fehlgeschlagen."
         },
         "common": {
             "app_title": "Onika Trainer",

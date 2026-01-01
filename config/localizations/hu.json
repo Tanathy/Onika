@@ -3,6 +3,7 @@
     "ui": {
         "sidebar": {
             "training": "Tréning",
+            "augmentation": "Augmentáció",
             "console": "Konzol",
             "metadata": "Metaadatok",
             "updates": "Frissítések",
@@ -51,7 +52,7 @@
                 "network": "Hálózat",
                 "dataset": "Adatkészlet",
                 "text_encoder": "Szövegkódoló",
-                "aug": "Augmentáció & gyorsítótárazás",
+                "caching": "Gyorsítótárazás",
                 "learning": "Tanulás",
                 "advanced": "Haladó",
                 "samples": "Minták",
@@ -228,25 +229,17 @@
                 "token_abs": "Token absztrakció",
                 "token_abs_help": "A helyettesítő szöveg (pl. \"TOK\"), ami az új fogalmat jelöli a captionökben."
             },
-            "aug": {
-                "aug_title": "Képaugmentáció",
-                "aug_mode": "Augmentáció mód",
-                "aug_mode_help": "Eldönti, mikor lépnek életbe az augmentációk tréning közben. <strong>Mindig:</strong> minden képet minden lépésnél augmentál — maximális változatosság, de kicsit lassíthat. <strong>Csak epochonként:</strong> az augmentációk epochonként egyszer sorsolódnak, és azon a körön belül fixek maradnak. Stabilabb, de még mindig keveri a dolgokat epochok között. <strong>Véletlen valószínűség:</strong> minden lépésnél képenként eldől, hogy legyen-e augmentáció, az egyedi beállítások alapján (pl. <a href=\"#\" class=\"xref-link\" data-xref=\"flip_aug_probability\" data-xref-label=\"Flip Aug Probability\" data-xref-tab=\"training\" data-xref-subtab=\"cfg-aug\">Flip Aug Probability</a>). A legtöbbször a \"Mindig\" vagy a \"Csak epochonként\" tökéletes.",
-                "color_aug": "Szín augmentáció erőssége",
-                "color_aug_help": "Mennyire rángassa meg a színeket (árnyalat, telítettség, fényerő) tréning közben. <strong>0.0:</strong> a színek pontosan ugyanazok maradnak — nincs belenyúlás. <strong>0.3-0.5:</strong> finom variáció, a legtöbb adatkészlethez szuper, és segít, hogy a modell ne a konkrét színeket magolja be. <strong>0.7-1.0:</strong> erős színeltolások. Furcsa kombók is kijöhetnek, viszont keményen tolja az általánosítást. Különösen hasznos karakter/stílus LoRÁ-knál, ha azt akarod, hogy a forma és a koncepció üljön, ne ragadjon le egy adott palettán. Kapcsold ki, ha fontos a színhűség (brand színek, konkrét ruhák, stb.).",
-                "flip_aug": "Tükrözés esélye",
-                "flip_aug_help": "Az esélye annak, hogy a képet vízszintesen tükrözze. <strong>0.5</strong> = 50/50, gyakorlatilag megduplázza az adatkészletedet tükrözött verziókkal. <strong>0.0</strong> = nincs tükrözés. <strong>Figyi:</strong> tedd 0-ra, ha a képeiden van: • <strong>szöveg vagy logó</strong> (visszafelé lenne) • <strong>aszimmetrikus dolog</strong> (autók, arcok jellegzetes oldallal) • <strong>irányfüggő tartalom</strong> (bal vs jobb kéz, specifikus póz). Szimmetrikus témákhoz (középre komponált portré, absztrakt, sok anime karakter) viszont remek. Kicsi adatkészleteknél az egyik legjobb trükk overfitting ellen.",
-                "crop_scale": "Véletlen vágás skála",
-                "crop_scale_help": "A véletlen vágás minimális zoom szintje. <strong>1.0:</strong> nincs vágás — a képek teljes méretben maradnak. <strong>0.8:</strong> 80–100% között vág, finom zoom variációkat adva. <strong>0.5:</strong> drasztikusabb — akár 2×-es belenagyítást is jelenthet, teljesen eltérő framinggel. A vágás megtanítja a modellt különböző skálákra és kompozíciókra. Szuper, ha a dataseted csupa \"tökéletesen középre komponált headshot\", de rugalmasabb kimenetet szeretnél. Hagyd 1.0-n, ha a pontos framing számít.",
-                "caption_aug_title": "Caption augmentáció",
-                "shuffle": "Captionök keverése",
-                "shuffle_help": "Minden használatkor összekeveri a tagek/szavak sorrendjét a captionökben. Megakadályozza, hogy a modell bemagoljon fix mintákat (pl. \"a kék szem mindig a hosszú haj előtt\"), inkább azt tanulja meg, hogy ezek a tagek bárhol előfordulhatnak. Booru-stílusú, vesszővel tagolt tagekhez tökéletes, ahol a sorrend nem számít. Használd a <a href=\"#\" class=\"xref-link\" data-xref=\"keep_tokens\" data-xref-label=\"Keep Tokens\" data-xref-tab=\"training\" data-xref-subtab=\"cfg-aug\">Keep Tokens</a>-t, ha azt akarod, hogy a trigger szó fixen maradjon. <strong>Ne használd</strong> természetes nyelvű captionökhöz, ahol a szórend jelentést hordoz (\"woman holding cat\" ≠ \"cat holding woman\").",
-                "keep_tokens": "Megtartott tokenek",
-                "keep_tokens_help": "Hány token legyen \"szent\" a caption elején, amit nem kever. <strong>0:</strong> mindent keverhet. <strong>1:</strong> az első token (általában a trigger szó) mindig első marad. <strong>2-3:</strong> védi a \"trigger, karakter_nev\" mintát. Ha a captionjeid így néznek ki: \"mytrigger, blonde hair, blue eyes, ...\", akkor 1-re állítva a \"mytrigger\" elöl rögzül, a többi pedig keveredik. Segít, hogy a modell a trigger–koncepció kapcsolatot tanulja, ne a konkrét sorrendet. Csak akkor számít, ha a <a href=\"#\" class=\"xref-link\" data-xref=\"shuffle_caption_checkbox\" data-xref-label=\"Shuffle Captions\" data-xref-tab=\"training\" data-xref-subtab=\"cfg-aug\">Shuffle Captions</a> be van kapcsolva.",
-                "dropout": "Dropout arány",
-                "dropout_help": "Annak valószínűsége, hogy egy kép captionje teljesen eldobásra kerül (mintha üres lenne). Ha a caption eltűnik, a modellnek kizárólag a vizuálisból kell kitalálnia a képet — ez az unconditional generálást tanítja. <strong>0.0:</strong> a caption mindig jelen van. <strong>0.05-0.1:</strong> enyhe dropout, finoman javíthatja az üres/gyenge promptokra adott viselkedést. <strong>0.15-0.2:</strong> agresszívebb — erősen tolja az unconditional minőséget. A dropout segíti a CFG-t inference-ben, mert a modell tényleg tudja, milyen a \"nincs prompt\" állapot. LoRA tréningnél, ahol a prompt követés a király, túl sok dropout visszaüthet. Egy pici (0.05) gyakran jó; nagyon rövid tréningnél akár hagyd is ki.",
-                "dropout_epochs": "Dropout minden N. epochban",
-                "dropout_epochs_help": "Nem lépésenként véletlenszerűen dob el, hanem konkrét epochokban. <strong>0:</strong> visszaáll a normál, véletlen <a href=\"#\" class=\"xref-link\" data-xref=\"caption_dropout_rate\" data-xref-label=\"Dropout Rate\" data-xref-tab=\"training\" data-xref-subtab=\"cfg-aug\">Dropout Rate</a> működésre. <strong>1:</strong> minden epoch caption nélküli (elég durva). <strong>5:</strong> az 5., 10., 15... epochok mennek caption nélkül. Strukturáltabb minta: többnyire normál tréning, időnként \"vak\" epochokkal. Speciális tanítási menetrendekhez hasznos, de a véletlen lépésenkénti dropout a gyakoribb.",
+            "caching": {
+                "caching_title": "Gyorsítótárazás",
+                "cache_latents": "Latensek cache-elése RAM-ba",
+                "cache_latents_help": "Előre kiszámolja a VAE latenseket, amivel jelentősen gyorsíthatja a tréninget (gyakran 2×–3×). Bekapcsolva minden latent RAM-ban marad tréning alatt. Ez letilt bizonyos valós idejű augmentációkat.",
+                "cache_te": "Szöveg embeddingek cache-elése",
+                "cache_te_help": "Előre kiszámolja a szöveg embeddingeket a gyorsabb tréninghez. Ez a beállítás nem kompatibilis az aktív szövegkódoló tréninggel.",
+                "cache_disk": "Latensek cache-elése lemezre",
+                "cache_disk_help": "Előre kiszámolt latenseket ment lemezre RAM spórolásért. Lassú lemez I/O ronthatja a teljesítményt. Ezeket a latenseket későbbi tréningeknél újra felhasználja. Ha változik az adatkészlet, manuálisan törölnöd kell a régi latenseket a cache-ből.",
+                "vae_batch": "VAE batch méret",
+                "vae_batch_help": "A VAE enkódolás batch mérete cache-eléskor. A magasabb érték gyorsít, de több VRAM kell hozzá.",
+                "vae_batch_placeholder": "Auto",
                 "noise_title": "Zaj beállítások",
                 "noise_type": "Zaj offset típusa",
                 "noise_type_help": "A zaj offset számításának matematikai módszere. Az \"Original\" a standard implementáció.",
@@ -261,17 +254,7 @@
                 "multires_discount": "Multires zaj diszkont",
                 "multires_discount_help": "A multi-resolution zaj iterációkra alkalmazott diszkont tényező.",
                 "edm": "EDM-stílusú tréning (SDXL)",
-                "edm_help": "Az EDM (Elucidating the Design Space of Diffusion-Based Generative Models) formulációt használja, ami SDXL-nél jobb minőségű kimenetet adhat.",
-                "caching_title": "Gyorsítótárazás",
-                "cache_latents": "Latensek cache-elése RAM-ba",
-                "cache_latents_help": "Előre kiszámolja a VAE latenseket, amivel jelentősen gyorsíthatja a tréninget (gyakran 2×–3×). Bekapcsolva minden latent RAM-ban marad tréning alatt. Ez letilt bizonyos valós idejű augmentációkat.",
-                "cache_te": "Szöveg embeddingek cache-elése",
-                "cache_te_help": "Előre kiszámolja a szöveg embeddingeket a gyorsabb tréninghez. Ez a beállítás nem kompatibilis az aktív szövegkódoló tréninggel.",
-                "cache_disk": "Latensek cache-elése lemezre",
-                "cache_disk_help": "Előre kiszámolt latenseket ment lemezre RAM spórolásért. Lassú lemez I/O ronthatja a teljesítményt. Ezeket a latenseket későbbi tréningeknél újra felhasználja. Ha változik az adatkészlet, manuálisan törölnöd kell a régi latenseket a cache-ből.",
-                "vae_batch": "VAE batch méret",
-                "vae_batch_help": "A VAE enkódolás batch mérete cache-eléskor. A magasabb érték gyorsít, de több VRAM kell hozzá.",
-                "vae_batch_placeholder": "Auto"
+                "edm_help": "Az EDM (Elucidating the Design Space of Diffusion-Based Generative Models) formulációt használja, ami SDXL-nél jobb minőségű kimenetet adhat."
             },
             "learning": {
                 "optimizer": "Optimalizáló",
@@ -381,7 +364,68 @@
                 "preset_default": "Default",
                 "preset_balanced": "Balanced",
                 "preset_quality": "Quality",
-                "preset_dark_light": "Dark/Light"
+                "preset_dark_light": "Dark/Light",
+                "loss_type": {
+                    "label": "Loss típusa",
+                    "help": "A matematikai függvény, ami meghatározza a hibaszámítás módját.",
+                    "options": {
+                        "l2": "L2 (MSE)",
+                        "huber": "Huber",
+                        "smooth_l1": "Smooth L1",
+                        "l1": "L1 (MAE)"
+                    }
+                },
+                "debiased_estimation_loss": {
+                    "label": "Debiased Estimation Loss",
+                    "help": "Kiegyensúlyozza a loss számítást a timestepek között."
+                },
+                "min_snr_gamma": {
+                    "label": "Min-SNR Gamma",
+                    "help": "Zajszint alapú súlyozás a stabilabb tréningért."
+                },
+                "snr_gamma": {
+                    "label": "SNR Gamma",
+                    "help": "Alternatív súlyozási gamma érték."
+                },
+                "prior_loss_weight": {
+                    "label": "Prior Loss Súly",
+                    "help": "A regularizációs képek hibájának súlyozása."
+                },
+                "scheduled_huber_schedule": {
+                    "label": "Scheduled Huber Ütemezés",
+                    "help": "A Huber küszöbérték változtatási stratégiája.",
+                    "options": {
+                        "constant": "Konstans",
+                        "exponential": "Exponenciális",
+                        "snr": "SNR alapú"
+                    }
+                },
+                "scheduled_huber_c": {
+                    "label": "Scheduled Huber C",
+                    "help": "A Huber loss alap küszöbértéke."
+                },
+                "scheduled_huber_scale": {
+                    "label": "Scheduled Huber Skála",
+                    "help": "Skálázó tényező a Huber ütemezéshez."
+                },
+                "scale_weight_norms": {
+                    "label": "Súly Normák Skálázása",
+                    "help": "Súlyok skálázása a normájuk alapján."
+                }
+            },
+            "optim": {
+                "gradient_checkpointing": {
+                    "label": "Gradient Checkpointing",
+                    "help": "VRAM spórolás a számítások újrafuttatásával. Lassabb, de kevesebb memóriát eszik."
+                },
+                "max_grad_norm": {
+                    "label": "Max Grad Norm",
+                    "help": "Gradiens vágás a stabilitásért."
+                },
+                "no_half_vae": {
+                    "label": "Nincs Half VAE",
+                    "help": "VAE kényszerítése float32 módba a NaN hibák elkerülésére."
+                }
             },
             "samples": {
                 "prompts_title": "Minta promptok",
@@ -456,6 +500,49 @@
                 "success": "Konvertálás sikeres!"
             }
         },
+        "augmentation": {
+            "title": "Augmentáció",
+            "subtitle": "Képaugmentációs beállítások előnézete és konfigurálása",
+            "btn_preview": "Előnézet generálása",
+            "btn_preview_loading": "Feldolgozás...",
+            "preview_page": "Oldal",
+            "preview_of": "/",
+            "preview_images": "kép",
+            "preview_original": "Eredeti",
+            "preview_augmented": "Augmentált",
+            "preview_no_images": "Nem található kép az adatkészletben",
+            "preview_error": "Nem sikerült az előnézet generálása",
+            "label_flipped": "Tükrözött",
+            "label_cropped": "Vágott",
+            "label_color_aug": "Szín Aug",
+            "tabs": {
+                "preview": "Előnézet",
+                "settings": "Beállítások"
+            },
+            "settings": {
+                "crop_jitter": "Kivágás variáció",
+                "crop_jitter_help": "Véletlenszerűen kivág a képből. <strong>0.0:</strong> Nincs kivágás. <strong>0.1:</strong> A kép 90-100%-a marad meg véletlenszerűen.",
+                "random_flip": "Véletlenszerű tükrözés",
+                "random_flip_help": "Esély a kép vízszintes tükrözésére. <strong>0.5:</strong> 50% esély. <strong>0.0:</strong> Nincs tükrözés.",
+                "random_brightness": "Véletlenszerű fényerő",
+                "random_brightness_help": "Véletlenszerűen módosítja a fényerőt. <strong>0.0:</strong> Nincs változás. <strong>0.1:</strong> +/- 10% ingadozás.",
+                "random_contrast": "Véletlenszerű kontraszt",
+                "random_contrast_help": "Véletlenszerűen módosítja a kontrasztot. <strong>0.0:</strong> Nincs változás. <strong>0.1:</strong> +/- 10% ingadozás.",
+                "random_saturation": "Véletlenszerű telítettség",
+                "random_saturation_help": "Véletlenszerűen módosítja a telítettséget. <strong>0.0:</strong> Nincs változás. <strong>0.1:</strong> +/- 10% ingadozás.",
+                "random_hue": "Véletlenszerű árnyalat",
+                "random_hue_help": "Véletlenszerűen eltolja a színárnyalatot. <strong>0.0:</strong> Nincs változás. <strong>0.1:</strong> Jelentős színeltolódás.",
+                "caption_aug_title": "Felirat Augmentáció",
+                "shuffle": "Feliratok keverése",
+                "shuffle_help": "A caption tagek/szavak sorrendjét véletlenszerűvé teszi minden egyes használatkor. Tökéletes booru-stílusú, vesszővel elválasztott tagekhez, ahol a sorrend nem számít.",
+                "keep_tokens": "Megtartott tokenek",
+                "keep_tokens_help": "Hány token marad fix az egyes feliratok elején (nem lesz keverve). <strong>1:</strong> Az első token (általában trigger word) mindig az elején marad.",
+                "dropout": "Dropout arány",
+                "dropout_help": "Esélye annak, hogy egy kép felirata teljesen kidobásra kerül. <strong>0.0:</strong> A feliratok mindig megmaradnak. <strong>0.05-0.1:</strong> Enyhe dropout.",
+                "dropout_epochs": "Dropout minden N. epoch-on",
+                "dropout_epochs_help": "A véletlenszerű lépésenkénti dropout helyett ez adott epoch-okon dobja ki a feliratokat. <strong>0:</strong> Visszaáll a normál véletlenszerű dropout viselkedésre."
+            }
+        },
         "console": {
             "title": "Rendszerkonzol (console)",
             "subtitle": "Valós idejű tréning logok és rendszerkimenet",
@@ -469,7 +556,12 @@
             "gpu_load": "GPU terhelés (GPU load)",
             "cpu_load": "CPU terhelés (CPU load)",
             "ram": "RAM",
-            "waiting": "Várakozás a tréning indítására..."
+            "waiting": "Várakozás a tréning indítására...",
+            "dataset_images": "Képek száma",
+            "dataset_tags": "Összes címke",
+            "dataset_no_tags": "Címke nélküli",
+            "dataset_dims": "Dimenziók (Min-Max)",
+            "btn_scan_dataset": "Adatkészlet vizsgálata"
         },
         "metadata_editor": {
             "title": "Metaadat szerkesztő (metadata editor)",
@@ -543,7 +635,9 @@
             "conversion_success": "Konvertálás sikeres!",
             "conversion_failed": "Konvertálás sikertelen: {error}",
             "conversion_error": "Konvertálási hiba: {error}",
-            "output_load_failed": "Nem sikerült betölteni a kimeneti fájlokat: {error}"
+            "output_load_failed": "Nem sikerült betölteni a kimeneti fájlokat: {error}",
+            "dataset_scan_success": "Adatkészlet vizsgálata kész!",
+            "dataset_scan_error": "Nem sikerült megvizsgálni az adatkészletet."
         },
         "common": {
             "app_title": "Onika Trainer",

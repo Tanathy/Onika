@@ -3,6 +3,7 @@
     "ui": {
         "sidebar": {
             "training": "Обучение",
+            "augmentation": "Аугментация",
             "console": "Консоль",
             "metadata": "Метаданные",
             "updates": "Обновления",
@@ -51,7 +52,7 @@
                 "network": "Сеть",
                 "dataset": "Датасет",
                 "text_encoder": "Текстовый энкодер",
-                "aug": "Аугментация & кэширование",
+                "caching": "Кэширование",
                 "learning": "Параметры обучения",
                 "advanced": "Дополнительно",
                 "samples": "Сэмплы",
@@ -228,25 +229,17 @@
                 "token_abs": "Token abstraction",
                 "token_abs_help": "Строка-заглушка (например, \"TOK\"), которая используется в captions, чтобы обозначать новый концепт."
             },
-            "aug": {
-                "aug_title": "Аугментация изображений",
-                "aug_mode": "Режим аугментации",
-                "aug_mode_help": "Определяет, когда аугментации включаются во время обучения. <strong>Always:</strong> каждое изображение аугментируется на каждом шаге — максимум разнообразия, но может немного замедлить обучение. <strong>Per Epoch Only:</strong> новые аугментации «бросаются» один раз на эпоху и остаются одинаковыми внутри этого прохода. Стабильнее, но всё равно меняется между эпохами. <strong>Random Probability:</strong> на каждом шаге аугментация для изображения может сработать или нет — в зависимости от отдельных настроек вроде <a href=\"#\" class=\"xref-link\" data-xref=\"flip_aug_probability\" data-xref-label=\"Flip Aug Probability\" data-xref-tab=\"training\" data-xref-subtab=\"cfg-aug\">Flip Aug Probability</a>. В большинстве случаев хватает «Always» или «Per Epoch Only».",
-                "color_aug": "Сила Color Aug",
-                "color_aug_help": "Насколько агрессивно «дёргать» цвета (hue, saturation, brightness) во время обучения. <strong>0.0:</strong> цвета остаются как есть — без вмешательства. <strong>0.3-0.5:</strong> мягкая вариативность, отлично подходит большинству датасетов и помогает модели не запоминать точные цвета. <strong>0.7-1.0:</strong> сильные сдвиги цвета. Может давать странные сочетания, но реально толкает обобщение. Особенно полезно для LoRA персонажей/стилей, когда тебе важно, чтобы модель «поймала» формы и концепты и не зациклилась на конкретной палитре. Выключи, если важна точная цветопередача (брендовые цвета, конкретные наряды и т. п.).",
-                "flip_aug": "Вероятность Flip Aug",
-                "flip_aug_help": "Шанс отзеркалить каждое изображение по горизонтали. <strong>0.5</strong> = условный бросок монетки 50/50, по сути удваивает датасет зеркальными версиями. <strong>0.0</strong> = без флипа вообще. <strong>Важно:</strong> поставь 0, если на изображениях есть: • <strong>текст или логотипы</strong> (станут наоборот) • <strong>асимметричные вещи</strong> (машины, лица с выраженной «стороной») • <strong>направленный контент</strong> (левая/правая рука, конкретные позы). Отлично работает для симметричных сюжетов: центрированные портреты, абстракция, многие аниме-персонажи. Один из лучших приёмов против overfitting на маленьких датасетах.",
-                "crop_scale": "Scale для Random Crop",
-                "crop_scale_help": "Минимальный уровень зума для случайного кропа. <strong>1.0:</strong> без кропа — изображения остаются в полном размере. <strong>0.8:</strong> кроп от 80% до 100%, даёт лёгкие вариции масштаба. <strong>0.5:</strong> заметнее — может приблизить до 2×, показывая модели очень разные кадрирования. Кроп учит модель работать с объектами в разных масштабах и композициях. Суперполезно, если датасет — это одни «идеально центрированные хедшоты», а ты хочешь больше гибкости в результатах. Держи 1.0, если точное кадрирование принципиально.",
-                "caption_aug_title": "Аугментация captions",
-                "shuffle": "Перемешивание captions (Shuffle Captions)",
-                "shuffle_help": "Каждый раз при использовании captions перемешивает порядок тегов/слов. Это не даёт модели заучивать фиксированные шаблоны вроде «blue eyes всегда перед long hair» — вместо этого она учится, что теги могут встречаться где угодно. Идеально для booru-стиля с тегами через запятую, где порядок не важен. Используй <a href=\"#\" class=\"xref-link\" data-xref=\"keep_tokens\" data-xref-label=\"Keep Tokens\" data-xref-tab=\"training\" data-xref-subtab=\"cfg-aug\">Keep Tokens</a>, если нужно, чтобы trigger-слово оставалось на месте. <strong>Не используй это</strong> для captions естественным языком, где порядок слов меняет смысл («woman holding cat» ≠ «cat holding woman»).",
-                "keep_tokens": "Зафиксировать tokens (Keep Tokens)",
-                "keep_tokens_help": "Сколько tokens в начале каждого caption считаются «священными» и не будут перемешиваться. <strong>0:</strong> перемешивается вообще всё. <strong>1:</strong> первый token (обычно trigger) всегда остаётся первым. <strong>2-3:</strong> защищает паттерны вида «trigger, character_name». Если твои captions выглядят как «mytrigger, blonde hair, blue eyes, ...», то значение 1 закрепляет «mytrigger» в начале, а остальное рандомится. Это помогает модели связать trigger ↔ концепт, не заучивая конкретный порядок тегов. Имеет смысл только когда включён <a href=\"#\" class=\"xref-link\" data-xref=\"shuffle_caption_checkbox\" data-xref-label=\"Shuffle Captions\" data-xref-tab=\"training\" data-xref-subtab=\"cfg-aug\">Shuffle Captions</a>.",
-                "dropout": "Вероятность dropout (Dropout Rate)",
-                "dropout_help": "Вероятность полностью выкинуть caption у изображения (заменив его на пустоту). Когда captions пропадают, модели приходится объяснять изображение чисто по визуалу — это тренирует unconditional generation. <strong>0.0:</strong> captions всегда присутствуют. <strong>0.05-0.1:</strong> лёгкий dropout — мягко улучшает поведение при пустых/слабых промптах. <strong>0.15-0.2:</strong> агрессивнее — сильнее толкает unconditional качество. Dropout помогает CFG (classifier-free guidance) работать лучше на inference, потому что модель реально знает, как выглядит «no prompt». Но в обучении LoRA, где prompt adherence — король, слишком большой dropout может навредить. Небольшое значение (0.05) часто полезно; для очень коротких прогонов можно вообще отключить.",
-                "dropout_epochs": "Dropout каждые N эпох",
-                "dropout_epochs_help": "Вместо случайного dropout на каждом шаге, это отключает captions на конкретных эпохах. <strong>0:</strong> возвращается к обычному поведению <a href=\"#\" class=\"xref-link\" data-xref=\"caption_dropout_rate\" data-xref-label=\"Dropout Rate\" data-xref-tab=\"training\" data-xref-subtab=\"cfg-aug\">Dropout Rate</a>. <strong>1:</strong> каждая эпоха идёт без captions (довольно экстремально). <strong>5:</strong> эпохи 5, 10, 15... проходят без captions. Это даёт более структурированный режим: обычно обучение нормальное, но периодически — «слепые» эпохи. Полезно для некоторых учебных программ, но на практике чаще используют случайный dropout по шагам.",
+            "caching": {
+                "caching_title": "Кэширование",
+                "cache_latents": "Кэшировать latents в RAM",
+                "cache_latents_help": "Предварительно вычисляет VAE latents, чтобы заметно ускорить обучение (часто 2x–3x). Если включено, все latents кэшируются и остаются в RAM на всё обучение. Это отключает часть аугментаций «в реальном времени».",
+                "cache_te": "Кэшировать text embeddings",
+                "cache_te_help": "Предварительно вычисляет text embeddings для ускорения обучения. Эта настройка несовместима с активным обучением Text Encoder.",
+                "cache_disk": "Кэшировать latents на диск",
+                "cache_disk_help": "Сохраняет заранее вычисленные latents на диск, чтобы экономить RAM. Учти: медленный диск/IO может ухудшить производительность. Эти latents переиспользуются между сессиями обучения. Если датасет изменился, старые latents нужно удалить из cache вручную.",
+                "vae_batch": "Размер batch для VAE (VAE Batch Size)",
+                "vae_batch_help": "Batch size, который используется для VAE-энкодинга во время кэширования. Большие значения ускоряют процесс, но требуют больше VRAM.",
+                "vae_batch_placeholder": "Auto",
                 "noise_title": "Настройки noise",
                 "noise_type": "Тип Noise Offset",
                 "noise_type_help": "Математический метод, который используется для расчёта noise offset. «Original» — стандартная реализация.",
@@ -261,17 +254,7 @@
                 "multires_discount": "Multires Noise Discount",
                 "multires_discount_help": "Коэффициент скидки (discount factor), который применяется к итерациям multi-resolution noise.",
                 "edm": "EDM-style обучение (SDXL)",
-                "edm_help": "Использует формулировку EDM (Elucidating the Design Space of Diffusion-Based Generative Models), которая может дать более качественные результаты для моделей SDXL.",
-                "caching_title": "Кэширование",
-                "cache_latents": "Кэшировать latents в RAM",
-                "cache_latents_help": "Предварительно вычисляет VAE latents, чтобы заметно ускорить обучение (часто 2x–3x). Если включено, все latents кэшируются и остаются в RAM на всё обучение. Это отключает часть аугментаций «в реальном времени».",
-                "cache_te": "Кэшировать text embeddings",
-                "cache_te_help": "Предварительно вычисляет text embeddings для ускорения обучения. Эта настройка несовместима с активным обучением Text Encoder.",
-                "cache_disk": "Кэшировать latents на диск",
-                "cache_disk_help": "Сохраняет заранее вычисленные latents на диск, чтобы экономить RAM. Учти: медленный диск/IO может ухудшить производительность. Эти latents переиспользуются между сессиями обучения. Если датасет изменился, старые latents нужно удалить из cache вручную.",
-                "vae_batch": "Размер batch для VAE (VAE Batch Size)",
-                "vae_batch_help": "Batch size, который используется для VAE-энкодинга во время кэширования. Большие значения ускоряют процесс, но требуют больше VRAM.",
-                "vae_batch_placeholder": "Auto"
+                "edm_help": "Использует формулировку EDM (Elucidating the Design Space of Diffusion-Based Generative Models), которая может дать более качественные результаты для моделей SDXL."
             },
             "learning": {
                 "optimizer": "Оптимизатор",
@@ -381,7 +364,68 @@
                 "preset_default": "Default",
                 "preset_balanced": "Balanced",
                 "preset_quality": "Quality",
-                "preset_dark_light": "Dark/Light"
+                "preset_dark_light": "Dark/Light",
+                "loss_type": {
+                    "label": "Тип Loss",
+                    "help": "Математическая функция для расчета ошибки.",
+                    "options": {
+                        "l2": "L2 (MSE)",
+                        "huber": "Huber",
+                        "smooth_l1": "Smooth L1",
+                        "l1": "L1 (MAE)"
+                    }
+                },
+                "debiased_estimation_loss": {
+                    "label": "Debiased Estimation Loss",
+                    "help": "Балансирует расчет loss между временными шагами."
+                },
+                "min_snr_gamma": {
+                    "label": "Min-SNR Gamma",
+                    "help": "Взвешивание на основе уровня шума для стабильности."
+                },
+                "snr_gamma": {
+                    "label": "SNR Gamma",
+                    "help": "Альтернативное значение гаммы."
+                },
+                "prior_loss_weight": {
+                    "label": "Вес Prior Loss",
+                    "help": "Вес ошибки для изображений регуляризации."
+                },
+                "scheduled_huber_schedule": {
+                    "label": "Расписание Scheduled Huber",
+                    "help": "Стратегия изменения порога Huber loss.",
+                    "options": {
+                        "constant": "Постоянная",
+                        "exponential": "Экспоненциальная",
+                        "snr": "На основе SNR"
+                    }
+                },
+                "scheduled_huber_c": {
+                    "label": "Scheduled Huber C",
+                    "help": "Базовый порог для Huber loss."
+                },
+                "scheduled_huber_scale": {
+                    "label": "Масштаб Scheduled Huber",
+                    "help": "Коэффициент масштабирования для расписания Huber."
+                },
+                "scale_weight_norms": {
+                    "label": "Масштабирование норм весов",
+                    "help": "Масштабирует веса на основе их нормы."
+                }
+            },
+            "optim": {
+                "gradient_checkpointing": {
+                    "label": "Gradient Checkpointing",
+                    "help": "Экономит VRAM за счет пересчета. Медленнее, но требует меньше памяти."
+                },
+                "max_grad_norm": {
+                    "label": "Max Grad Norm",
+                    "help": "Обрезание градиентов для стабильности."
+                },
+                "no_half_vae": {
+                    "label": "Без Half VAE",
+                    "help": "Принудительный float32 для VAE, чтобы избежать NaN."
+                }
             },
             "samples": {
                 "prompts_title": "Промпты для сэмплов",
@@ -456,6 +500,49 @@
                 "success": "Конвертация успешна!"
             }
         },
+        "augmentation": {
+            "title": "Аугментация",
+            "subtitle": "Предпросмотр и настройка аугментации изображений",
+            "btn_preview": "Создать предпросмотр",
+            "btn_preview_loading": "Обработка...",
+            "preview_page": "Страница",
+            "preview_of": "из",
+            "preview_images": "изображений",
+            "preview_original": "Оригинал",
+            "preview_augmented": "Аугментированное",
+            "preview_no_images": "Изображения не найдены в наборе данных",
+            "preview_error": "Не удалось создать предпросмотр",
+            "label_flipped": "Отражено",
+            "label_cropped": "Обрезано",
+            "label_color_aug": "Цвет. ауг.",
+            "tabs": {
+                "preview": "Предпросмотр",
+                "settings": "Настройки"
+            },
+            "settings": {
+                "crop_jitter": "Вариация обрезки",
+                "crop_jitter_help": "Случайная обрезка изображения. <strong>0.0:</strong> Без обрезки. <strong>0.1:</strong> Случайная обрезка 90-100% размера.",
+                "random_flip": "Случайное отражение",
+                "random_flip_help": "Вероятность горизонтального отражения. <strong>0.5:</strong> 50/50. <strong>0.0:</strong> Без отражения.",
+                "random_brightness": "Случайная яркость",
+                "random_brightness_help": "Случайное изменение яркости. <strong>0.0:</strong> Без изменений. <strong>0.1:</strong> +/- 10% вариации.",
+                "random_contrast": "Случайный контраст",
+                "random_contrast_help": "Случайное изменение контраста. <strong>0.0:</strong> Без изменений. <strong>0.1:</strong> +/- 10% вариации.",
+                "random_saturation": "Случайная насыщенность",
+                "random_saturation_help": "Случайное изменение насыщенности. <strong>0.0:</strong> Без изменений. <strong>0.1:</strong> +/- 10% вариации.",
+                "random_hue": "Случайный оттенок",
+                "random_hue_help": "Случайный сдвиг оттенка. <strong>0.0:</strong> Без изменений. <strong>0.1:</strong> Значительный сдвиг цвета.",
+                "caption_aug_title": "Аугментация подписей",
+                "shuffle": "Перемешивать подписи",
+                "shuffle_help": "Случайным образом меняет порядок тегов/слов в подписях при каждом использовании. Идеально для booru-стиля тегов через запятую, где порядок не важен.",
+                "keep_tokens": "Сохранять токены",
+                "keep_tokens_help": "Сколько токенов в начале каждой подписи \"священны\" и не будут перемешаны. <strong>1:</strong> Первый токен (обычно триггер) всегда остаётся первым.",
+                "dropout": "Вероятность пропуска",
+                "dropout_help": "Вероятность полного удаления подписи изображения. <strong>0.0:</strong> Подписи всегда присутствуют. <strong>0.05-0.1:</strong> Лёгкий пропуск.",
+                "dropout_epochs": "Пропуск каждые N эпох",
+                "dropout_epochs_help": "Вместо случайного пропуска на каждом шаге, подписи удаляются на определённых эпохах. <strong>0:</strong> Возврат к обычному случайному пропуску."
+            }
+        },
         "console": {
             "title": "Системная консоль",
             "subtitle": "Логи обучения и системный вывод в реальном времени",
@@ -469,7 +556,12 @@
             "gpu_load": "Загрузка GPU",
             "cpu_load": "Загрузка CPU",
             "ram": "RAM",
-            "waiting": "Ожидание начала обучения..."
+            "waiting": "Ожидание начала обучения...",
+            "dataset_images": "Изображения",
+            "dataset_tags": "Всего тегов",
+            "dataset_no_tags": "Без тегов",
+            "dataset_dims": "Размеры (Мин-Макс)",
+            "btn_scan_dataset": "Сканировать датасет"
         },
         "metadata_editor": {
             "title": "Редактор метаданных",
@@ -543,7 +635,9 @@
             "conversion_success": "Конвертация успешна!",
             "conversion_failed": "Конвертация не удалась: {error}",
             "conversion_error": "Ошибка конвертации: {error}",
-            "output_load_failed": "Не удалось загрузить выходные файлы: {error}"
+            "output_load_failed": "Не удалось загрузить выходные файлы: {error}",
+            "dataset_scan_success": "Сканирование датасета завершено!",
+            "dataset_scan_error": "Не удалось сканировать датасет."
         },
         "common": {
             "app_title": "Onika Trainer",

@@ -77,6 +77,7 @@ def get_cpu_info() -> Dict[str, Any]:
     return {
         "cpu_count": psutil.cpu_count(logical=False),
         "logical_count": psutil.cpu_count(logical=True),
+        "cpu_percent": psutil.cpu_percent(interval=None),
         "total_ram": psutil.virtual_memory().total / (1024**3), # GB
         "available_ram": psutil.virtual_memory().available / (1024**3) # GB
     }

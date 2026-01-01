@@ -8,6 +8,8 @@
     <link rel="stylesheet" href="/ui/style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="/ui/const.js"></script>
 </head>
 <body>
     <div id="notification-container"></div>
@@ -22,6 +24,7 @@
         <!-- SIDEBAR -->
         <nav class="sidebar">
             <button id="nav-training" class="nav-item active" onclick="openTab('training')" data-lang-key="ui.sidebar.training"></button>
+            <button id="nav-augmentation" class="nav-item" onclick="openTab('augmentation')" data-lang-key="ui.sidebar.augmentation"></button>
             <button class="nav-item" onclick="openTab('console')" data-lang-key="ui.sidebar.console"></button>
             <button class="nav-item" onclick="openTab('metadata')" data-lang-key="ui.sidebar.metadata"></button>
             <button class="nav-item" onclick="openTab('updates')" data-lang-key="ui.sidebar.updates"></button>
@@ -119,7 +122,7 @@
                         <button type="button" class="sub-tab-btn" onclick="openSubTab('cfg-network')" data-lang-key="ui.training.tabs.network"></button>
                         <button type="button" class="sub-tab-btn" onclick="openSubTab('cfg-dataset')" data-lang-key="ui.training.tabs.dataset"></button>
                         <button type="button" class="sub-tab-btn" onclick="openSubTab('cfg-te')" data-lang-key="ui.training.tabs.text_encoder"></button>
-                        <button type="button" class="sub-tab-btn" onclick="openSubTab('cfg-aug')" data-lang-key="ui.training.tabs.aug"></button>
+                        <button type="button" class="sub-tab-btn" onclick="openSubTab('cfg-aug')" data-lang-key="ui.training.tabs.caching"></button>
                         <button type="button" class="sub-tab-btn" onclick="openSubTab('cfg-basic')" data-lang-key="ui.training.tabs.learning"></button>
                         <button type="button" class="sub-tab-btn" onclick="openSubTab('cfg-advanced')" data-lang-key="ui.training.tabs.advanced"></button>
                         <button type="button" class="sub-tab-btn" onclick="openSubTab('cfg-samples')" data-lang-key="ui.training.tabs.samples"></button>
@@ -584,142 +587,84 @@
                             </div>
                         </div>
 
-                        <!-- Augmentation & Caching Config -->
+                        <!-- Caching Config (renamed from Augmentation & Caching) -->
                         <div id="cfg-aug" class="sub-tab-content">
-                            <div class="field-title" data-lang-key="ui.training.aug.caching_title"></div>
+                            <div class="field-title" data-lang-key="ui.training.caching.caching_title"></div>
                             <div class="form-row">
                                 <div class="form-group">
                                     <label class="checkbox-label" data-pointer="cache_latents">
                                         <input type="checkbox" name="cache_latents" checked>
-                                        <span data-lang-key="ui.training.aug.cache_latents"></span>
+                                        <span data-lang-key="ui.training.caching.cache_latents"></span>
                                     </label>
-                                    <div class="help-text" data-lang-key="ui.training.aug.cache_latents_help"></div>
+                                    <div class="help-text" data-lang-key="ui.training.caching.cache_latents_help"></div>
                                 </div>
                                 <div class="form-group">
                                     <label class="checkbox-label" data-pointer="cache_latents_disk">
                                         <input type="checkbox" name="cache_latents_to_disk">
-                                        <span data-lang-key="ui.training.aug.cache_disk"></span>
+                                        <span data-lang-key="ui.training.caching.cache_disk"></span>
                                     </label>
-                                    <div class="help-text" data-lang-key="ui.training.aug.cache_disk_help"></div>
+                                    <div class="help-text" data-lang-key="ui.training.caching.cache_disk_help"></div>
                                 </div>
                             </div>
                             <div class="form-group">
                                 <label class="checkbox-label">
                                     <input type="checkbox" name="cache_text_embeddings">
-                                    <span data-lang-key="ui.training.aug.cache_te"></span>
+                                    <span data-lang-key="ui.training.caching.cache_te"></span>
                                 </label>
-                                <div class="help-text" data-lang-key="ui.training.aug.cache_te_help"></div>
+                                <div class="help-text" data-lang-key="ui.training.caching.cache_te_help"></div>
                             </div>
                             <div class="form-group">
-                                <label data-pointer="vae_batch" data-lang-key="ui.training.aug.vae_batch"></label>
-                                <input type="number" name="vae_batch_size" data-lang-placeholder="ui.training.aug.vae_batch_placeholder">
-                                <div class="help-text" data-lang-key="ui.training.aug.vae_batch_help"></div>
+                                <label data-pointer="vae_batch" data-lang-key="ui.training.caching.vae_batch"></label>
+                                <input type="number" name="vae_batch_size" data-lang-placeholder="ui.training.caching.vae_batch_placeholder">
+                                <div class="help-text" data-lang-key="ui.training.caching.vae_batch_help"></div>
                             </div>
 
-                            <div class="field-title" style="margin-top: 16px;" data-lang-key="ui.training.aug.noise_title"></div>
+                            <div class="field-title" style="margin-top: 16px;" data-lang-key="ui.training.caching.noise_title"></div>
                             <div class="form-row">
                                 <div class="form-group">
-                                    <label data-lang-key="ui.training.aug.noise_offset"></label>
+                                    <label data-lang-key="ui.training.caching.noise_offset"></label>
                                     <input type="number" name="noise_offset_strength" value="0" step="0.01">
-                                    <div class="help-text" data-lang-key="ui.training.aug.noise_offset_help"></div>
+                                    <div class="help-text" data-lang-key="ui.training.caching.noise_offset_help"></div>
                                 </div>
                                 <div class="form-group">
-                                    <label data-lang-key="ui.training.aug.noise_random"></label>
+                                    <label data-lang-key="ui.training.caching.noise_random"></label>
                                     <input type="number" name="noise_offset_random_strength" value="0" step="0.01">
-                                    <div class="help-text" data-lang-key="ui.training.aug.noise_random_help"></div>
+                                    <div class="help-text" data-lang-key="ui.training.caching.noise_random_help"></div>
                                 </div>
                             </div>
                             <div class="form-row">
                                 <div class="form-group">
-                                    <label data-lang-key="ui.training.aug.noise_type"></label>
+                                    <label data-lang-key="ui.training.caching.noise_type"></label>
                                     <select name="noise_offset_type">
                                         <option value="original">Original</option>
                                         <option value="alternative">Alternative</option>
                                     </select>
-                                    <div class="help-text" data-lang-key="ui.training.aug.noise_type_help"></div>
+                                    <div class="help-text" data-lang-key="ui.training.caching.noise_type_help"></div>
                                 </div>
                                 <div class="form-group">
-                                    <label data-lang-key="ui.training.aug.adaptive_noise"></label>
+                                    <label data-lang-key="ui.training.caching.adaptive_noise"></label>
                                     <input type="number" name="adaptive_noise_scale" value="0" step="0.01">
-                                    <div class="help-text" data-lang-key="ui.training.aug.adaptive_noise_help"></div>
+                                    <div class="help-text" data-lang-key="ui.training.caching.adaptive_noise_help"></div>
                                 </div>
                             </div>
                             <div class="form-row">
                                 <div class="form-group">
-                                    <label data-lang-key="ui.training.aug.multires_iter"></label>
+                                    <label data-lang-key="ui.training.caching.multires_iter"></label>
                                     <input type="number" name="multires_noise_iterations" value="0">
-                                    <div class="help-text" data-lang-key="ui.training.aug.multires_iter_help"></div>
+                                    <div class="help-text" data-lang-key="ui.training.caching.multires_iter_help"></div>
                                 </div>
                                 <div class="form-group">
-                                    <label data-lang-key="ui.training.aug.multires_discount"></label>
+                                    <label data-lang-key="ui.training.caching.multires_discount"></label>
                                     <input type="number" name="multires_noise_discount" value="0" step="0.1">
-                                    <div class="help-text" data-lang-key="ui.training.aug.multires_discount_help"></div>
+                                    <div class="help-text" data-lang-key="ui.training.caching.multires_discount_help"></div>
                                 </div>
                             </div>
                             <div class="form-group">
                                 <label class="checkbox-label">
                                     <input type="checkbox" name="do_edm_style_training">
-                                    <span data-lang-key="ui.training.aug.edm"></span>
+                                    <span data-lang-key="ui.training.caching.edm"></span>
                                 </label>
-                                <div class="help-text" data-lang-key="ui.training.aug.edm_help"></div>
-                            </div>
-
-                            <div class="field-title" style="margin-top: 16px;" data-lang-key="ui.training.aug.aug_title"></div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label data-pointer="aug_mode" data-lang-key="ui.training.aug.aug_mode"></label>
-                                    <select name="augmentation_mode">
-                                        <option value="always">Always</option>
-                                        <option value="per_epoch">Per Epoch Only</option>
-                                        <option value="random">Random Probability</option>
-                                    </select>
-                                    <div class="help-text" data-lang-key="ui.training.aug.aug_mode_help"></div>
-                                </div>
-                                <div class="form-group">
-                                    <label data-pointer="color_aug_strength" data-lang-key="ui.training.aug.color_aug"></label>
-                                    <input type="number" name="color_aug_strength" value="0.5" step="0.1" min="0" max="1">
-                                    <div class="help-text" data-lang-key="ui.training.aug.color_aug_help"></div>
-                                </div>
-                            </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label data-pointer="flip_aug_probability" data-lang-key="ui.training.aug.flip_aug"></label>
-                                    <input type="number" name="flip_aug_probability" value="0.5" step="0.1" min="0" max="1">
-                                    <div class="help-text" data-lang-key="ui.training.aug.flip_aug_help"></div>
-                                </div>
-                                <div class="form-group">
-                                    <label data-pointer="random_crop_scale" data-lang-key="ui.training.aug.crop_scale"></label>
-                                    <input type="number" name="random_crop_scale" value="1.0" step="0.05" min="0.5" max="1.0">
-                                    <div class="help-text" data-lang-key="ui.training.aug.crop_scale_help"></div>
-                                </div>
-                            </div>
-                            
-                            <div class="field-title" style="margin-top: 16px;" data-lang-key="ui.training.aug.caption_aug_title"></div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label data-pointer="caption_dropout_rate" data-lang-key="ui.training.aug.dropout"></label>
-                                    <input type="number" name="caption_dropout_rate" value="0.0" step="0.1">
-                                    <div class="help-text" data-lang-key="ui.training.aug.dropout_help"></div>
-                                </div>
-                                <div class="form-group">
-                                    <label data-pointer="caption_dropout_every_n_epochs" data-lang-key="ui.training.aug.dropout_epochs"></label>
-                                    <input type="number" name="caption_dropout_every_n_epochs" value="0">
-                                    <div class="help-text" data-lang-key="ui.training.aug.dropout_epochs_help"></div>
-                                </div>
-                            </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label data-pointer="keep_tokens" data-lang-key="ui.training.aug.keep_tokens"></label>
-                                    <input type="number" name="keep_tokens" value="0">
-                                    <div class="help-text" data-lang-key="ui.training.aug.keep_tokens_help"></div>
-                                </div>
-                                <div class="form-group">
-                                    <label class="checkbox-label" data-pointer="shuffle_caption_checkbox" style="margin-top: 30px;">
-                                        <input type="checkbox" name="shuffle_caption" id="shuffle_caption_checkbox">
-                                        <span data-lang-key="ui.training.aug.shuffle"></span>
-                                    </label>
-                                    <div class="help-text" data-lang-key="ui.training.aug.shuffle_help"></div>
-                                </div>
+                                <div class="help-text" data-lang-key="ui.training.caching.edm_help"></div>
                             </div>
                         </div>
 
@@ -1199,6 +1144,121 @@
                 </div>
             </div>
 
+            <!-- AUGMENTATION TAB -->
+            <div id="tab-augmentation" class="tab-content">
+                <div class="page-header">
+                    <h1 class="page-title" data-lang-key="ui.augmentation.title"></h1>
+                    <p class="page-subtitle" data-lang-key="ui.augmentation.subtitle"></p>
+                </div>
+
+                <div class="card">
+                    <div class="sub-tabs">
+                        <button type="button" class="sub-tab-btn active" onclick="openSubTab('aug-preview')" data-lang-key="ui.augmentation.tabs.preview"></button>
+                        <button type="button" class="sub-tab-btn" onclick="openSubTab('aug-settings')" data-lang-key="ui.augmentation.tabs.settings"></button>
+                    </div>
+
+                    <!-- Preview Sub-tab -->
+                    <div id="aug-preview" class="sub-tab-content active">
+                        <div class="aug-preview-controls">
+                            <button type="button" id="btn-aug-preview" class="btn btn-primary" onclick="runAugmentationPreview()" data-lang-key="ui.augmentation.btn_preview"></button>
+                        </div>
+
+                        <div id="aug-preview-container" class="aug-preview-container" style="display: none;">
+                            <div class="aug-preview-header">
+                                <div class="aug-preview-info">
+                                    <span id="aug-preview-count">0</span>
+                                    <span data-lang-key="ui.augmentation.preview_images"></span>
+                                </div>
+                                <div class="aug-preview-pagination">
+                                    <button type="button" class="btn btn-secondary btn-sm" id="aug-prev-page" onclick="augPreviewPrevPage()" disabled>&larr;</button>
+                                    <span id="aug-page-info">
+                                        <span data-lang-key="ui.augmentation.preview_page"></span>
+                                        <span id="aug-current-page">1</span>
+                                        <span data-lang-key="ui.augmentation.preview_of"></span>
+                                        <span id="aug-total-pages">1</span>
+                                    </span>
+                                    <button type="button" class="btn btn-secondary btn-sm" id="aug-next-page" onclick="augPreviewNextPage()" disabled>&rarr;</button>
+                                </div>
+                            </div>
+                            <div id="aug-preview-gallery" class="aug-preview-gallery">
+                                <!-- Gallery items will be injected here -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Settings Sub-tab -->
+                    <div id="aug-settings" class="sub-tab-content">
+                        <!-- Crop & Flip -->
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label data-lang-key="ui.augmentation.settings.crop_jitter"></label>
+                                <input type="number" name="crop_jitter" form="training-form" value="0" step="0.05" min="0" max="1">
+                                <div class="help-text" data-lang-key="ui.augmentation.settings.crop_jitter_help"></div>
+                            </div>
+                            <div class="form-group">
+                                <label data-lang-key="ui.augmentation.settings.random_flip"></label>
+                                <input type="number" name="random_flip" form="training-form" value="0" step="0.1" min="0" max="1">
+                                <div class="help-text" data-lang-key="ui.augmentation.settings.random_flip_help"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Color Augmentations -->
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label data-lang-key="ui.augmentation.settings.random_brightness"></label>
+                                <input type="number" name="random_brightness" form="training-form" value="0" step="0.05" min="0" max="1">
+                                <div class="help-text" data-lang-key="ui.augmentation.settings.random_brightness_help"></div>
+                            </div>
+                            <div class="form-group">
+                                <label data-lang-key="ui.augmentation.settings.random_contrast"></label>
+                                <input type="number" name="random_contrast" form="training-form" value="0" step="0.05" min="0" max="1">
+                                <div class="help-text" data-lang-key="ui.augmentation.settings.random_contrast_help"></div>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label data-lang-key="ui.augmentation.settings.random_saturation"></label>
+                                <input type="number" name="random_saturation" form="training-form" value="0" step="0.05" min="0" max="1">
+                                <div class="help-text" data-lang-key="ui.augmentation.settings.random_saturation_help"></div>
+                            </div>
+                            <div class="form-group">
+                                <label data-lang-key="ui.augmentation.settings.random_hue"></label>
+                                <input type="number" name="random_hue" form="training-form" value="0" step="0.01" min="0" max="0.5">
+                                <div class="help-text" data-lang-key="ui.augmentation.settings.random_hue_help"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="field-title" style="margin-top: 16px;" data-lang-key="ui.augmentation.settings.caption_aug_title"></div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label data-pointer="caption_dropout_rate" data-lang-key="ui.augmentation.settings.dropout"></label>
+                                <input type="number" name="caption_dropout_rate" form="training-form" value="0.0" step="0.1">
+                                <div class="help-text" data-lang-key="ui.augmentation.settings.dropout_help"></div>
+                            </div>
+                            <div class="form-group">
+                                <label data-pointer="caption_dropout_every_n_epochs" data-lang-key="ui.augmentation.settings.dropout_epochs"></label>
+                                <input type="number" name="caption_dropout_every_n_epochs" form="training-form" value="0">
+                                <div class="help-text" data-lang-key="ui.augmentation.settings.dropout_epochs_help"></div>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label data-pointer="keep_tokens" data-lang-key="ui.augmentation.settings.keep_tokens"></label>
+                                <input type="number" name="keep_tokens" form="training-form" value="0">
+                                <div class="help-text" data-lang-key="ui.augmentation.settings.keep_tokens_help"></div>
+                            </div>
+                            <div class="form-group">
+                                <label class="checkbox-label" data-pointer="shuffle_caption_checkbox" style="margin-top: 30px;">
+                                    <input type="checkbox" name="shuffle_caption" form="training-form" id="shuffle_caption_checkbox">
+                                    <span data-lang-key="ui.augmentation.settings.shuffle"></span>
+                                </label>
+                                <div class="help-text" data-lang-key="ui.augmentation.settings.shuffle_help"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- DATASET TAB REMOVED -->
 
             <!-- CONSOLE TAB -->
@@ -1261,6 +1321,29 @@
                         </div>
                     </div>
 
+                    <!-- Dataset Stats Bar -->
+                    <div class="console-stats dataset-stats mt-2">
+                        <div class="stat-item">
+                            <span class="stat-label" data-lang-key="ui.console.dataset_images"></span>
+                            <span class="stat-value" id="console-dataset-images">--</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label" data-lang-key="ui.console.dataset_tags"></span>
+                            <span class="stat-value" id="console-dataset-tags">--</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label" data-lang-key="ui.console.dataset_no_tags"></span>
+                            <span class="stat-value" id="console-dataset-no-tags">--</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label" data-lang-key="ui.console.dataset_dims"></span>
+                            <span class="stat-value" id="console-dataset-dims">--</span>
+                        </div>
+                    </div>
+                    <div class="mt-1 mb-2" style="display: flex; justify-content: flex-end;">
+                        <button class="btn-secondary btn-sm" onclick="scanDataset()" data-lang-key="ui.console.btn_scan_dataset"></button>
+                    </div>
+
                     <!-- Loss Chart -->
                     <div class="progress-grid mb-2">
                         <div class="chart-panel">
@@ -1269,6 +1352,16 @@
                                 <div class="label" data-lang-key="ui.training.progress.loss_label"></div>
                                 <div class="value" id="current-loss">--</div>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Dataset Graphs -->
+                    <div class="progress-grid mb-2" style="grid-template-columns: 1fr 1fr; gap: 12px;">
+                        <div class="chart-panel" style="height: 200px;">
+                            <canvas id="ar-chart"></canvas>
+                        </div>
+                        <div class="chart-panel" style="height: 200px;">
+                            <canvas id="brightness-chart"></canvas>
                         </div>
                     </div>
 

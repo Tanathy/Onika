@@ -98,9 +98,12 @@ class TrainingConfig(BaseModel):
 
     # Image Augmentation
     augmentation_mode: str = Field("always", description="always, per_epoch, random")
-    color_aug_strength: float = Field(0.5, description="Color augmentation strength")
-    flip_aug_probability: float = Field(0.5, description="Flip augmentation probability")
-    random_crop_scale: float = Field(1.0, description="Random crop scale")
+    crop_jitter: float = Field(0.0, description="Random crop jitter (0-1)")
+    random_flip: float = Field(0.0, description="Random flip probability (0-1)")
+    random_brightness: float = Field(0.0, description="Random brightness jitter (0-1)")
+    random_contrast: float = Field(0.0, description="Random contrast jitter (0-1)")
+    random_saturation: float = Field(0.0, description="Random saturation jitter (0-1)")
+    random_hue: float = Field(0.0, description="Random hue jitter (0-0.5)")
 
     # Caption Augmentation
     caption_dropout_rate: float = Field(0.0, description="Caption dropout rate")

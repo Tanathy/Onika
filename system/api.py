@@ -39,6 +39,18 @@ class UpdateApplyRequest(BaseModel):
 class LocalizationSwitchRequest(BaseModel):
     lang_code: str
 
+class AugmentationPreviewRequest(BaseModel):
+    resolution: int = 1024
+    dataset_path: str = "project/dataset"
+    count: int = 100
+    # New individual augmentation values
+    crop_jitter: float = 0.0
+    random_flip: float = 0.0
+    random_brightness: float = 0.0
+    random_contrast: float = 0.0
+    random_saturation: float = 0.0
+    random_hue: float = 0.0
+
 def init_app(root_path: Path):
     app = FastAPI(title="Onika Trainer")
     
@@ -137,6 +149,10 @@ def init_app(root_path: Path):
     @app.get("/api/dataset/images")
     async def get_dataset_images():
         return DATASET_MANAGER.get_images()
+
+    @app.get("/api/dataset/scan")
+    async def scan_dataset():
+        return DATASET_MANAGER.scan_dataset()
 
     @app.post("/api/dataset/caption")
     async def update_caption(data: CaptionUpdate):
@@ -283,6 +299,241 @@ def init_app(root_path: Path):
     @app.post("/api/updates/apply")
     async def apply_updates(data: UpdateApplyRequest):
         return updater.apply_updates(data.selected_paths)
+
+    # Augmentation Preview - Session Storage
+    _aug_preview_cache = {}  # session_id -> {images: [...], expires: timestamp}
+    
+    @app.post("/api/augmentation/preview")
+    async def augmentation_preview(req: AugmentationPreviewRequest):
+        """Generate augmentation preview metadata (no image data, just metadata + session ID)."""
+        import random
+        import io
+        import uuid
+        import time
+        from PIL import Image, ImageDraw
+        from PIL.ImageOps import exif_transpose
+        
+        dataset_dir = Path(req.dataset_path)
+        if not dataset_dir.is_absolute():
+            dataset_dir = root_path / dataset_dir
+        
+        if not dataset_dir.exists():
+            raise HTTPException(status_code=400, detail=f"Dataset path not found: {req.dataset_path}")
+        
+        # Get all valid images
+        valid_exts = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
+        all_images = [p for p in dataset_dir.iterdir() if p.suffix.lower() in valid_exts]
+        
+        if not all_images:
+            raise HTTPException(status_code=400, detail="No images found in dataset")
+        
+        # Sample random images (up to count)
+        sample_count = min(req.count, len(all_images))
+        sampled_images = random.sample(all_images, sample_count)
+        
+        # Generate session ID
+        session_id = str(uuid.uuid4())
+        
+        results = []
+        cached_images = []
+        target_size = req.resolution
+        preview_size = 384  # Thumbnail size
+        
+        # Make resolution divisible by 8
+        target_size = (target_size // 8) * 8
+        if target_size == 0:
+            target_size = 8
+        
+        for idx, img_path in enumerate(sampled_images):
+            try:
+                # Load image
+                img = Image.open(img_path)
+                img = exif_transpose(img)
+                if img.mode != "RGB":
+                    img = img.convert("RGB")
+                
+                original_size = img.size  # (w, h)
+                augmentations_applied = []
+                
+                w, h = original_size
+                
+                # Crop Jitter - value is the jitter amount (0 = no jitter, 1 = full jitter)
+                if req.crop_jitter > 0:
+                    # crop_jitter of 0.2 means crop scale between 0.8 and 1.0
+                    min_scale = 1.0 - req.crop_jitter
+                    actual_scale = random.uniform(min_scale, 1.0)
+                    scaled_size = int(min(w, h) * actual_scale)
+                    augmentations_applied.append(f"Crop {actual_scale:.0%}")
+                else:
+                    scaled_size = min(w, h)
+                    actual_scale = 1.0
+                
+                # Make divisible by 8
+                final_crop_size = (scaled_size // 8) * 8
+                if final_crop_size == 0:
+                    final_crop_size = 8
+                
+                # Center crop coordinates
+                crop_left = (w - final_crop_size) // 2
+                crop_top = (h - final_crop_size) // 2
+                crop_right = crop_left + final_crop_size
+                crop_bottom = crop_top + final_crop_size
+                crop_box = (crop_left, crop_top, crop_right, crop_bottom)
+                
+                # Apply crop
+                cropped_img = img.crop(crop_box)
+                
+                # Resize to target
+                if cropped_img.size[0] != target_size:
+                    cropped_img = cropped_img.resize((target_size, target_size), Image.Resampling.LANCZOS)
+                
+                # Random Flip
+                flipped = False
+                if req.random_flip > 0 and random.random() < req.random_flip:
+                    cropped_img = cropped_img.transpose(Image.FLIP_LEFT_RIGHT)
+                    flipped = True
+                    augmentations_applied.append("Flip")
+                
+                # Individual color augmentations
+                from PIL import ImageEnhance
+                
+                # Random Brightness
+                if req.random_brightness > 0:
+                    factor = 1.0 + random.uniform(-req.random_brightness, req.random_brightness)
+                    enhancer = ImageEnhance.Brightness(cropped_img)
+                    cropped_img = enhancer.enhance(factor)
+                    augmentations_applied.append("Brightness")
+                
+                # Random Contrast
+                if req.random_contrast > 0:
+                    factor = 1.0 + random.uniform(-req.random_contrast, req.random_contrast)
+                    enhancer = ImageEnhance.Contrast(cropped_img)
+                    cropped_img = enhancer.enhance(factor)
+                    augmentations_applied.append("Contrast")
+                
+                # Random Saturation
+                if req.random_saturation > 0:
+                    factor = 1.0 + random.uniform(-req.random_saturation, req.random_saturation)
+                    enhancer = ImageEnhance.Color(cropped_img)
+                    cropped_img = enhancer.enhance(factor)
+                    augmentations_applied.append("Saturation")
+                
+                # Random Hue
+                if req.random_hue > 0:
+                    import colorsys
+                    import numpy as np
+                    img_array = np.array(cropped_img).astype(np.float32) / 255.0
+                    hue_shift = random.uniform(-req.random_hue, req.random_hue)
+                    result = np.zeros_like(img_array)
+                    for i in range(img_array.shape[0]):
+                        for j in range(img_array.shape[1]):
+                            r, g, b = img_array[i, j]
+                            h, s, v = colorsys.rgb_to_hsv(r, g, b)
+                            h = (h + hue_shift) % 1.0
+                            r, g, b = colorsys.hsv_to_rgb(h, s, v)
+                            result[i, j] = [r, g, b]
+                    cropped_img = Image.fromarray((result * 255).astype(np.uint8))
+                    augmentations_applied.append("Hue")
+                
+                # Create preview image with crop overlay on original
+                scale_factor = preview_size / max(original_size)
+                display_size = (int(original_size[0] * scale_factor), int(original_size[1] * scale_factor))
+                display_img = img.resize(display_size, Image.Resampling.LANCZOS)
+                
+                scaled_crop = (
+                    int(crop_left * scale_factor),
+                    int(crop_top * scale_factor),
+                    int(crop_right * scale_factor),
+                    int(crop_bottom * scale_factor)
+                )
+                
+                # Semi-transparent overlay outside crop area
+                overlay = Image.new('RGBA', display_img.size, (0, 0, 0, 0))
+                overlay_draw = ImageDraw.Draw(overlay)
+                
+                
+                overlay_draw.rectangle([0, 0, display_img.size[0], scaled_crop[1]], fill=(0, 0, 0, 120))
+                overlay_draw.rectangle([0, scaled_crop[3], display_img.size[0], display_img.size[1]], fill=(0, 0, 0, 120))
+                overlay_draw.rectangle([0, scaled_crop[1], scaled_crop[0], scaled_crop[3]], fill=(0, 0, 0, 120))
+                overlay_draw.rectangle([scaled_crop[2], scaled_crop[1], display_img.size[0], scaled_crop[3]], fill=(0, 0, 0, 120))
+                
+                overlay_draw.rectangle(scaled_crop, outline=(205, 255, 0, 255), width=2)
+                
+                display_img = display_img.convert('RGBA')
+                display_img = Image.alpha_composite(display_img, overlay)
+                display_img = display_img.convert('RGB')
+                
+                # Store JPEG bytes in cache (not base64)
+                aug_buffer = io.BytesIO()
+                aug_thumb = cropped_img.resize((preview_size, preview_size), Image.Resampling.LANCZOS)
+                aug_thumb.save(aug_buffer, format='JPEG', quality=85)
+                aug_bytes = aug_buffer.getvalue()
+                
+                orig_buffer = io.BytesIO()
+                display_img.save(orig_buffer, format='JPEG', quality=85)
+                orig_bytes = orig_buffer.getvalue()
+                
+                # Cache the raw bytes
+                cached_images.append({
+                    "original_bytes": orig_bytes,
+                    "augmented_bytes": aug_bytes
+                })
+                
+                # Return only metadata (no image data)
+                results.append({
+                    "id": idx,
+                    "filename": img_path.name,
+                    "original_size": list(original_size),
+                    "crop_box": list(crop_box),
+                    "augmentations": augmentations_applied,
+                    "flipped": flipped,
+                    "crop_scale": actual_scale if crop_scale < 1.0 else 1.0
+                })
+                
+            except Exception as e:
+                continue
+        
+        # Clean up old sessions (older than 10 minutes)
+        current_time = time.time()
+        expired = [sid for sid, data in _aug_preview_cache.items() if data["expires"] < current_time]
+        for sid in expired:
+            del _aug_preview_cache[sid]
+        
+        # Store new session (expires in 10 minutes)
+        _aug_preview_cache[session_id] = {
+            "images": cached_images,
+            "expires": current_time + 600
+        }
+        
+        return {
+            "status": "success",
+            "session_id": session_id,
+            "count": len(results),
+            "total_dataset": len(all_images),
+            "images": results
+        }
+    
+    @app.get("/api/augmentation/preview/{session_id}/{index}/{img_type}")
+    async def get_augmentation_image(session_id: str, index: int, img_type: str):
+        """Return raw JPEG bytes for a specific preview image."""
+        from fastapi.responses import Response
+        
+        if session_id not in _aug_preview_cache:
+            raise HTTPException(status_code=404, detail="Session expired or not found")
+        
+        session = _aug_preview_cache[session_id]
+        
+        if index < 0 or index >= len(session["images"]):
+            raise HTTPException(status_code=404, detail="Image index out of range")
+        
+        img_data = session["images"][index]
+        
+        if img_type == "original":
+            return Response(content=img_data["original_bytes"], media_type="image/jpeg")
+        elif img_type == "augmented":
+            return Response(content=img_data["augmented_bytes"], media_type="image/jpeg")
+        else:
+            raise HTTPException(status_code=400, detail="Invalid image type. Use 'original' or 'augmented'")
 
     # Serve UI
     ui_path = root_path / "ui"

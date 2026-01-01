@@ -5,9 +5,7 @@
     "debug_mode": false,
     "http_timeout": 30,
     "update_repository_url": "https://raw.githubusercontent.com/Tanathy/Onika/refs/heads/main/",
-    "update_skip_paths": [
-        "config/configs.json"
-    ],
+    "update_skip_paths": [],
     "paths": {
         "dataset": "project/dataset",
         "models": "models",
