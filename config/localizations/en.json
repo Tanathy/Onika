@@ -495,7 +495,9 @@
             "stop_confirm": "Are you sure you want to stop the training process?",
             "stop_warning": "Any unsaved progress will be lost. The current checkpoint will not be saved.",
             "btn_stop": "Stop Training",
-            "update_confirm": "Are you sure you want to apply {count} update(s)?"
+            "update_title": "Apply Updates",
+            "update_confirm": "Are you sure you want to apply {count} update(s)?",
+            "update_warning": "Please restart the application manually after the update is complete."
         },
         "notifications": {
             "updates_available": "Updates available!",

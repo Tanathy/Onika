@@ -1420,6 +1420,24 @@
         </div>
     </div>
 
+    <!-- Update Confirmation Modal -->
+    <div id="update-confirm-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title" data-lang-key="ui.modals.update_title"></h2>
+                <button class="modal-close" onclick="closeUpdateModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="update-confirm-text"></p>
+                <p style="color: var(--text-muted); font-size: 12px; margin-top: 12px;" data-lang-key="ui.modals.update_warning"></p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeUpdateModal()" data-lang-key="ui.modals.btn_cancel"></button>
+                <button class="btn-success" onclick="confirmApplyUpdates()" data-lang-key="ui.updates.btn_apply"></button>
+            </div>
+        </div>
+    </div>
+
     <script src="/ui/app.js"></script>
 </body>
 </html>

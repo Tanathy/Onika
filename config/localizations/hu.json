@@ -495,7 +495,9 @@
             "stop_confirm": "Biztosan leállítod a tréninget?",
             "stop_warning": "Minden el nem mentett haladás elveszik. Az aktuális checkpoint nem lesz elmentve.",
             "btn_stop": "Leállítás",
-            "update_confirm": "Biztosan alkalmazni szeretnél {count} frissítést?"
+            "update_title": "Frissítések alkalmazása",
+            "update_confirm": "Biztosan alkalmazni szeretnél {count} frissítést?",
+            "update_warning": "Kérjük, a frissítés befejezése után indítsa újra manuálisan az alkalmazást."
         },
         "notifications": {
             "updates_available": "Frissítések érhetők el!",

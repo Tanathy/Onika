@@ -495,7 +495,9 @@
             "stop_confirm": "Bist du sicher, dass du den Trainingsprozess stoppen möchtest?",
             "stop_warning": "Jeder nicht gespeicherte Fortschritt geht verloren. Der aktuelle Checkpoint wird nicht gespeichert.",
             "btn_stop": "Training stoppen",
-            "update_confirm": "Are you sure you want to apply {count} update(s)?"
+            "update_title": "Updates anwenden",
+            "update_confirm": "Bist du sicher, dass du {count} Update(s) anwenden möchtest?",
+            "update_warning": "Bitte starten Sie die Anwendung nach Abschluss des Updates manuell neu."
         },
         "notifications": {
             "updates_available": "Updates verfügbar!",

@@ -264,16 +264,25 @@ async function checkUpdates() {
     }
 }
 
-async function applyUpdates() {
+function applyUpdates() {
+    const modal = document.getElementById('update-confirm-modal');
+    const text = document.getElementById('update-confirm-text');
+    text.textContent = lang('ui.modals.update_confirm', { count: _pendingUpdates.length }) || `Are you sure you want to apply ${_pendingUpdates.length} update(s)?`;
+    modal.classList.remove('hidden');
+}
+
+function closeUpdateModal() {
+    document.getElementById('update-confirm-modal').classList.add('hidden');
+}
+
+async function confirmApplyUpdates() {
     const btn = document.getElementById('btn-apply-updates');
     const checkBtn = document.getElementById('btn-check-updates');
     const statusText = document.getElementById('update-status-text');
     const logCard = document.getElementById('update-log-card');
     const logArea = document.getElementById('update-log');
 
-    if (!confirm(lang('ui.modals.update_confirm', { count: _pendingUpdates.length }) || `Are you sure you want to apply ${_pendingUpdates.length} update(s)?`)) {
-        return;
-    }
+    closeUpdateModal();
 
     btn.disabled = true;
     checkBtn.disabled = true;

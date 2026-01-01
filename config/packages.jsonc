@@ -55,6 +55,11 @@
         "invisible-watermark"
     ],
     "folder_structure": [
-        "projects/"
+        "project/cache",
+        "project/dataset",
+        "project/debug",
+        "project/outputs",
+        "project/reg",
+        "models"
     ]
 }
