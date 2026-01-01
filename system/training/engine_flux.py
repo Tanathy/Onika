@@ -182,7 +182,7 @@ def train_flux(config: TrainingConfig, status_callback: Callable):
     # Cache Latents if requested
     if config.cache_latents_to_disk:
         status_callback(0, 0, 0, 0, "Caching latents to disk...")
-        cache_latents_to_disk(vae, dataset, config, accelerator, status_callback=status_callback)
+        cache_latents_to_disk(vae, dataset, config, accelerator, status_callback=status_callback, epoch=0)
         dataset.use_cached_latents = True
         dataset.cache_dir = get_latents_cache_dir(config)
 
@@ -320,9 +320,27 @@ def train_flux(config: TrainingConfig, status_callback: Callable):
             return F.smooth_l1_loss(pred.float(), tgt.float(), reduction="mean")
         return F.mse_loss(pred.float(), tgt.float(), reduction="mean")
     
+    # Check if augmentations are enabled for epoch-based recaching
+    has_augmentations = (
+        getattr(config, "crop_jitter", 0.0) > 0 or
+        getattr(config, "random_flip", 0.0) > 0 or
+        getattr(config, "random_brightness", 0.0) > 0 or
+        getattr(config, "random_contrast", 0.0) > 0 or
+        getattr(config, "random_saturation", 0.0) > 0 or
+        getattr(config, "random_hue", 0.0) > 0
+    )
+    
     stop_training = False
     best_loss = float("inf")
     for epoch in range(first_epoch, planned_epochs):
+        # Re-cache latents each epoch if disk caching + augmentations are enabled
+        if config.cache_latents_to_disk and has_augmentations and epoch > first_epoch:
+            status_callback(global_step, max_train_steps, 0, epoch, f"Regenerating augmented latents for epoch {epoch}...")
+            vae.to(accelerator.device)
+            cache_latents_to_disk(vae, dataset, config, accelerator, status_callback=status_callback, epoch=epoch)
+            vae.to("cpu")
+            flush()
+        
         transformer.train()
         if config.train_text_encoder:
             text_encoder.train()

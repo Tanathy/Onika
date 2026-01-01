@@ -18,8 +18,8 @@ class DatasetManager:
         if not self.dataset_dir.exists():
             return []
 
-        for file_path in self.dataset_dir.iterdir():
-            if file_path.suffix.lower() in valid_exts:
+        for file_path in self.dataset_dir.rglob("*"):
+            if file_path.is_file() and file_path.suffix.lower() in valid_exts:
                 # Look for corresponding text file
                 txt_path = file_path.with_suffix(".txt")
                 caption = ""
@@ -30,8 +30,15 @@ class DatasetManager:
                     except Exception:
                         pass
                 
+                # Use relative path for name to support subdirectories
+                try:
+                    rel_path = file_path.relative_to(self.dataset_dir)
+                    name = str(rel_path)
+                except ValueError:
+                    name = file_path.name
+
                 images.append({
-                    "name": file_path.name,
+                    "name": name,
                     "path": str(file_path),
                     "caption": caption
                 })
@@ -74,7 +81,7 @@ class DatasetManager:
                 "brightness_distribution": brightness_buckets
             }
 
-        files = [f for f in self.dataset_dir.iterdir() if f.suffix.lower() in valid_exts]
+        files = [f for f in self.dataset_dir.rglob("*") if f.is_file() and f.suffix.lower() in valid_exts]
         total_images = len(files)
         
         # Sampling for brightness (max 2000 images for speed)

@@ -23,15 +23,24 @@ def _make_divisible_by_8(size: int) -> int:
     return (size // 8) * 8
 
 
-def _center_crop_to_square_div8(image: Image.Image, target_size: int) -> tuple:
+def _center_crop_to_square_div8(image: Image.Image, target_size: int, crop_jitter: float = 0.0) -> tuple:
     """
     Center crop image to square, ensuring final size is divisible by 8.
+    If crop_jitter > 0, applies random crop scale (e.g., 0.2 means scale between 0.8 and 1.0)
     Returns (cropped_image, crop_box, final_size)
     """
+    import random
+    
     w, h = image.size
     
     # Determine the square size (minimum of width/height)
     square_size = min(w, h)
+    
+    # Apply crop jitter if specified (random scale between (1-jitter) and 1.0)
+    if crop_jitter > 0:
+        min_scale = 1.0 - crop_jitter
+        actual_scale = random.uniform(min_scale, 1.0)
+        square_size = int(square_size * actual_scale)
     
     # If target_size is specified and smaller, use that
     if target_size and target_size < square_size:
@@ -164,6 +173,9 @@ class OnikaDataset(Dataset):
         self.size = _make_divisible_by_8(config.resolution)  # Ensure resolution is divisible by 8
         self.instance_data_root = Path(config.dataset_path)
         
+        # Crop jitter for random crop during training
+        self.crop_jitter = getattr(config, "crop_jitter", 0.0) or 0.0
+        
         # Debug mode setup
         self.debug_mode = SETTINGS.get("debug_mode", False)
         self.debug_dir: Optional[Path] = None
@@ -199,15 +211,31 @@ class OnikaDataset(Dataset):
             # Leave aug_transforms empty on purpose.
             pass
         else:
-            if config.flip_aug_probability > 0:
-                self.aug_transforms.append(transforms.RandomHorizontalFlip(p=config.flip_aug_probability))
+            # Use new schema field names (random_flip instead of flip_aug_probability)
+            flip_prob = getattr(config, "random_flip", 0.0) or getattr(config, "flip_aug_probability", 0.0)
+            if flip_prob > 0:
+                self.aug_transforms.append(transforms.RandomHorizontalFlip(p=flip_prob))
             
-            if config.color_aug_strength > 0:
+            # Build ColorJitter from individual parameters or legacy color_aug_strength
+            brightness = getattr(config, "random_brightness", 0.0) or 0.0
+            contrast = getattr(config, "random_contrast", 0.0) or 0.0
+            saturation = getattr(config, "random_saturation", 0.0) or 0.0
+            hue = getattr(config, "random_hue", 0.0) or 0.0
+            
+            # Fallback to legacy color_aug_strength if no individual values set
+            legacy_strength = getattr(config, "color_aug_strength", 0.0) or 0.0
+            if legacy_strength > 0 and brightness == 0 and contrast == 0 and saturation == 0 and hue == 0:
+                brightness = legacy_strength * 0.2
+                contrast = legacy_strength * 0.2
+                saturation = legacy_strength * 0.2
+                hue = legacy_strength * 0.1
+            
+            if brightness > 0 or contrast > 0 or saturation > 0 or hue > 0:
                 self.aug_transforms.append(transforms.ColorJitter(
-                    brightness=config.color_aug_strength * 0.2,
-                    contrast=config.color_aug_strength * 0.2,
-                    saturation=config.color_aug_strength * 0.2,
-                    hue=config.color_aug_strength * 0.1
+                    brightness=brightness,
+                    contrast=contrast,
+                    saturation=saturation,
+                    hue=min(hue, 0.5)  # Clamp hue to valid range
                 ))
         
         # Final transforms (to tensor)
@@ -307,7 +335,9 @@ class OnikaDataset(Dataset):
         
         # ALWAYS center crop to square with size divisible by 8
         # This applies regardless of bucketing settings
-        cropped_image, crop_box, final_size = _center_crop_to_square_div8(instance_image, self.size)
+        # Apply crop_jitter if not using cached latents (cache incompatible with realtime augmentation)
+        jitter = self.crop_jitter if not self.use_cached_latents else 0.0
+        cropped_image, crop_box, final_size = _center_crop_to_square_div8(instance_image, self.size, crop_jitter=jitter)
         
         # Resize to target resolution if needed (also divisible by 8)
         if cropped_image.size[0] != self.size:
@@ -767,10 +797,10 @@ def save_lora_weights(accelerator, model, config, step, text_encoder=None, text_
         "ss_shuffle_caption": str(config.shuffle_caption),
         "ss_caption_dropout_rate": str(config.caption_dropout_rate),
         "ss_caption_dropout_every_n_epochs": str(config.caption_dropout_every_n_epochs),
-        "ss_color_aug": str(config.color_aug_strength > 0),
-        "ss_flip_aug": str(config.flip_aug_probability > 0),
+        "ss_color_aug": str((getattr(config, "random_brightness", 0) or getattr(config, "random_contrast", 0) or getattr(config, "random_saturation", 0) or getattr(config, "random_hue", 0) or getattr(config, "color_aug_strength", 0)) > 0),
+        "ss_flip_aug": str((getattr(config, "random_flip", 0) or getattr(config, "flip_aug_probability", 0)) > 0),
         "ss_face_crop_aug_range": "None", # Not implemented yet
-        "ss_random_crop": str(config.random_crop_scale < 1.0),
+        "ss_random_crop": str(getattr(config, "crop_jitter", 0) > 0 or getattr(config, "random_crop_scale", 1.0) < 1.0),
         "ss_full_fp16": str(config.full_fp16),
         "ss_zero_terminal_snr": str(config.zero_terminal_snr) if hasattr(config, "zero_terminal_snr") else "False",
         "ss_max_token_length": str(config.max_token_length) if config.max_token_length else "None",
@@ -1248,9 +1278,13 @@ def generate_class_images(config: Any, accelerator: Accelerator, status_callback
     flush()
     info("Regularization image generation complete.")
 
-def cache_latents_to_disk(vae, dataset, config, accelerator, status_callback: Optional[Callable] = None):
+def cache_latents_to_disk(vae, dataset, config, accelerator, status_callback: Optional[Callable] = None, epoch: int = 0):
     """
     Pre-computes latents for all instance images and saves them to disk.
+    If augmentations are enabled, latents are regenerated each epoch with new random augmentations.
+    
+    Args:
+        epoch: Current epoch number. If augmentations are enabled, forces regeneration.
     """
     cache_dir = get_latents_cache_dir(config)
     cache_dir.mkdir(parents=True, exist_ok=True)
@@ -1261,8 +1295,36 @@ def cache_latents_to_disk(vae, dataset, config, accelerator, status_callback: Op
 
     index_path = cache_dir / "index.jsonl"
     fingerprints_path = cache_dir / "fingerprints.json"
+    augmentation_state_path = cache_dir / "augmentation_state.json"
     
-    info(f"Caching latents to {cache_dir}...")
+    # Check if augmentations are enabled
+    has_augmentations = (
+        getattr(config, "crop_jitter", 0.0) > 0 or
+        getattr(config, "random_flip", 0.0) > 0 or
+        getattr(config, "random_brightness", 0.0) > 0 or
+        getattr(config, "random_contrast", 0.0) > 0 or
+        getattr(config, "random_saturation", 0.0) > 0 or
+        getattr(config, "random_hue", 0.0) > 0
+    )
+    
+    # If augmentations are enabled, check if we need to regenerate for this epoch
+    force_regenerate = False
+    if has_augmentations:
+        try:
+            if augmentation_state_path.exists():
+                import json
+                with open(augmentation_state_path, "r") as f:
+                    state = json.load(f)
+                cached_epoch = state.get("epoch", -1)
+                if cached_epoch != epoch:
+                    force_regenerate = True
+                    info(f"Epoch {epoch}: Regenerating augmented latents (previous epoch: {cached_epoch})")
+            else:
+                force_regenerate = True
+        except Exception:
+            force_regenerate = True
+    
+    info(f"Caching latents to {cache_dir}..." + (f" (epoch {epoch}, augmented)" if has_augmentations else ""))
 
     if status_callback:
         try:
@@ -1316,6 +1378,10 @@ def cache_latents_to_disk(vae, dataset, config, accelerator, status_callback: Op
 
     # Process in chunks
     def _gather_missing(to_check: List[Path], kind: str, root: Path) -> List[Path]:
+        # If force_regenerate is True (new epoch with augmentations), return ALL paths
+        if force_regenerate:
+            return list(to_check)
+        
         missing: List[Path] = []
         for p in to_check:
             candidates = _latent_cache_paths(cache_dir, kind, root, p)
@@ -1365,6 +1431,14 @@ def cache_latents_to_disk(vae, dataset, config, accelerator, status_callback: Op
         batch_images = []
         batch_metadata = []
         
+        # Get augmentation parameters from config
+        crop_jitter = getattr(config, "crop_jitter", 0.0) if has_augmentations else 0.0
+        random_flip = getattr(config, "random_flip", 0.0) if has_augmentations else 0.0
+        random_brightness = getattr(config, "random_brightness", 0.0) if has_augmentations else 0.0
+        random_contrast = getattr(config, "random_contrast", 0.0) if has_augmentations else 0.0
+        random_saturation = getattr(config, "random_saturation", 0.0) if has_augmentations else 0.0
+        random_hue = getattr(config, "random_hue", 0.0) if has_augmentations else 0.0
+        
         for kind, path, root in batch_items:
             try:
                 img = Image.open(path)
@@ -1373,12 +1447,56 @@ def cache_latents_to_disk(vae, dataset, config, accelerator, status_callback: Op
                     img = img.convert("RGB")
                 
                 original_size = img.size
-                cropped_img, crop_box, _ = _center_crop_to_square_div8(img, dataset.size)
+                
+                # Apply crop jitter during caching if augmentations enabled
+                cropped_img, crop_box, _ = _center_crop_to_square_div8(img, dataset.size, crop_jitter=crop_jitter)
                 
                 if cropped_img.size[0] != dataset.size:
                     cropped_img = cropped_img.resize((dataset.size, dataset.size), Image.Resampling.LANCZOS)
                 
-                # No augmentation for caching
+                # Apply augmentations during caching (epoch-based)
+                import random as rng
+                augmentations_applied = []
+                
+                # Random Flip
+                if random_flip > 0 and rng.random() < random_flip:
+                    cropped_img = cropped_img.transpose(Image.Transpose.FLIP_LEFT_RIGHT if hasattr(Image, 'Transpose') else Image.FLIP_LEFT_RIGHT)
+                    augmentations_applied.append("flip")
+                
+                # Color augmentations
+                from PIL import ImageEnhance
+                
+                if random_brightness > 0:
+                    factor = 1.0 + rng.uniform(-random_brightness, random_brightness)
+                    cropped_img = ImageEnhance.Brightness(cropped_img).enhance(factor)
+                    augmentations_applied.append("brightness")
+                
+                if random_contrast > 0:
+                    factor = 1.0 + rng.uniform(-random_contrast, random_contrast)
+                    cropped_img = ImageEnhance.Contrast(cropped_img).enhance(factor)
+                    augmentations_applied.append("contrast")
+                
+                if random_saturation > 0:
+                    factor = 1.0 + rng.uniform(-random_saturation, random_saturation)
+                    cropped_img = ImageEnhance.Color(cropped_img).enhance(factor)
+                    augmentations_applied.append("saturation")
+                
+                if random_hue > 0:
+                    import colorsys
+                    import numpy as np
+                    img_array = np.array(cropped_img).astype(np.float32) / 255.0
+                    hue_shift = rng.uniform(-random_hue, random_hue)
+                    result = np.zeros_like(img_array)
+                    for yi in range(img_array.shape[0]):
+                        for xi in range(img_array.shape[1]):
+                            r, g, b = img_array[yi, xi]
+                            h, s, v = colorsys.rgb_to_hsv(r, g, b)
+                            h = (h + hue_shift) % 1.0
+                            r, g, b = colorsys.hsv_to_rgb(h, s, v)
+                            result[yi, xi] = [r, g, b]
+                    cropped_img = Image.fromarray((result * 255).astype(np.uint8))
+                    augmentations_applied.append("hue")
+                
                 tensor = dataset.final_transforms(cropped_img)
                 batch_images.append(tensor)
                 batch_metadata.append({
@@ -1386,7 +1504,8 @@ def cache_latents_to_disk(vae, dataset, config, accelerator, status_callback: Op
                     "root": root,
                     "original_size": (original_size[1], original_size[0]),
                     "crop_top_left": (crop_box[1], crop_box[0]),
-                    "path": path
+                    "path": path,
+                    "augmentations": augmentations_applied
                 })
             except Exception as e:
                 print(f"Error processing {path} for cache: {e}")
@@ -1436,6 +1555,8 @@ def cache_latents_to_disk(vae, dataset, config, accelerator, status_callback: Op
                     "cache_path": str(save_path.relative_to(cache_dir)).replace("\\", "/"),
                     "original_size": list(meta["original_size"]),
                     "crop_top_left": list(meta["crop_top_left"]),
+                    "epoch": epoch,
+                    "augmentations": meta.get("augmentations", [])
                 }
                 with open(index_path, "a", encoding="utf-8") as f:
                     import json
@@ -1452,7 +1573,7 @@ def cache_latents_to_disk(vae, dataset, config, accelerator, status_callback: Op
             except TypeError:
                 status_callback(processed_items, total_items, 0.0, 0, None)
             
-    info(f"Cached latents: instance={len(instance_missing)} class={len(class_missing)}")
+    info(f"Cached latents: instance={len(instance_missing)} class={len(class_missing)}" + (f" (epoch {epoch})" if has_augmentations else ""))
 
     # Persist fingerprints (best-effort, atomic-ish)
     try:
@@ -1462,6 +1583,22 @@ def cache_latents_to_disk(vae, dataset, config, accelerator, status_callback: Op
         tmp.replace(fingerprints_path)
     except Exception:
         pass
+    
+    # Save augmentation state (epoch number) for next run
+    if has_augmentations:
+        try:
+            with open(augmentation_state_path, "w", encoding="utf-8") as f:
+                json.dump({"epoch": epoch, "augmentations_enabled": True}, f)
+        except Exception:
+            pass
+    
+    # Clear index.jsonl on force regenerate to avoid stale entries
+    if force_regenerate and index_path.exists():
+        try:
+            index_path.unlink()
+        except Exception:
+            pass
+    
     flush()
     if status_callback:
         try:

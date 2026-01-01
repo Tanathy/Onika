@@ -385,12 +385,14 @@ def init_app(root_path: Path):
                 
                 # Resize to target
                 if cropped_img.size[0] != target_size:
-                    cropped_img = cropped_img.resize((target_size, target_size), Image.Resampling.LANCZOS)
+                    resample_method = Image.Resampling.LANCZOS if hasattr(Image, 'Resampling') else Image.LANCZOS
+                    cropped_img = cropped_img.resize((target_size, target_size), resample_method)
                 
                 # Random Flip
                 flipped = False
                 if req.random_flip > 0 and random.random() < req.random_flip:
-                    cropped_img = cropped_img.transpose(Image.FLIP_LEFT_RIGHT)
+                    transpose_method = Image.Transpose.FLIP_LEFT_RIGHT if hasattr(Image, 'Transpose') else Image.FLIP_LEFT_RIGHT
+                    cropped_img = cropped_img.transpose(transpose_method)
                     flipped = True
                     augmentations_applied.append("Flip")
                 
@@ -438,7 +440,8 @@ def init_app(root_path: Path):
                 # Create preview image with crop overlay on original
                 scale_factor = preview_size / max(original_size)
                 display_size = (int(original_size[0] * scale_factor), int(original_size[1] * scale_factor))
-                display_img = img.resize(display_size, Image.Resampling.LANCZOS)
+                resample_method = Image.Resampling.LANCZOS if hasattr(Image, 'Resampling') else Image.LANCZOS
+                display_img = img.resize(display_size, resample_method)
                 
                 scaled_crop = (
                     int(crop_left * scale_factor),
@@ -465,7 +468,8 @@ def init_app(root_path: Path):
                 
                 # Store JPEG bytes in cache (not base64)
                 aug_buffer = io.BytesIO()
-                aug_thumb = cropped_img.resize((preview_size, preview_size), Image.Resampling.LANCZOS)
+                resample_method = Image.Resampling.LANCZOS if hasattr(Image, 'Resampling') else Image.LANCZOS
+                aug_thumb = cropped_img.resize((preview_size, preview_size), resample_method)
                 aug_thumb.save(aug_buffer, format='JPEG', quality=85)
                 aug_bytes = aug_buffer.getvalue()
                 
@@ -487,10 +491,13 @@ def init_app(root_path: Path):
                     "crop_box": list(crop_box),
                     "augmentations": augmentations_applied,
                     "flipped": flipped,
-                    "crop_scale": actual_scale if crop_scale < 1.0 else 1.0
+                    "crop_scale": actual_scale if actual_scale < 1.0 else 1.0
                 })
                 
             except Exception as e:
+                print(f"Error processing image {img_path}: {e}")
+                import traceback
+                traceback.print_exc()
                 continue
         
         # Clean up old sessions (older than 10 minutes)

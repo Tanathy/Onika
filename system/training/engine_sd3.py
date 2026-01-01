@@ -160,7 +160,7 @@ def train_sd3(config: TrainingConfig, status_callback: Optional[Callable] = None
     if config.cache_latents_to_disk:
         if status_callback:
             status_callback(0, 0, 0, 0, "Caching latents to disk...")
-        cache_latents_to_disk(vae, dataset, config, accelerator, status_callback=status_callback)
+        cache_latents_to_disk(vae, dataset, config, accelerator, status_callback=status_callback, epoch=0)
         dataset.use_cached_latents = True
         dataset.cache_dir = get_latents_cache_dir(config)
 
@@ -293,8 +293,26 @@ def train_sd3(config: TrainingConfig, status_callback: Optional[Callable] = None
     epoch = first_epoch
 
     best_loss = float("inf")
+    
+    # Check if augmentations are enabled for epoch-based recaching
+    has_augmentations = (
+        getattr(config, "crop_jitter", 0.0) > 0 or
+        getattr(config, "random_flip", 0.0) > 0 or
+        getattr(config, "random_brightness", 0.0) > 0 or
+        getattr(config, "random_contrast", 0.0) > 0 or
+        getattr(config, "random_saturation", 0.0) > 0 or
+        getattr(config, "random_hue", 0.0) > 0
+    )
 
     for epoch in range(first_epoch, num_epochs):
+        # Re-cache latents each epoch if disk caching + augmentations are enabled
+        if config.cache_latents_to_disk and has_augmentations and epoch > first_epoch:
+            status_callback(global_step, max_train_steps, 0, epoch, f"Regenerating augmented latents for epoch {epoch}...")
+            vae.to(accelerator.device)
+            cache_latents_to_disk(vae, dataset, config, accelerator, status_callback=status_callback, epoch=epoch)
+            vae.to("cpu")
+            flush()
+        
         transformer.train()
         if config.train_text_encoder:
             text_encoder_one.train()
